@@ -16,13 +16,24 @@ use crate::annotate::{
     marker_radius,
 };
 
-pub fn render_to_image(
+/// Save `img` into `dir` under the timestamped scrannotate name, creating
+/// the directory if needed. Returns the written path.
+pub fn save_timestamped(img: &RgbaImage, dir: &std::path::Path) -> Result<std::path::PathBuf> {
+    std::fs::create_dir_all(dir)
+        .with_context(|| format!("creating {}", dir.display()))?;
+    let name = format!("scrannotate-{}.png", chrono::Local::now().format("%Y-%m-%d_%H%M%S"));
+    let path = dir.join(name);
+    img.save(&path).with_context(|| format!("saving {}", path.display()))?;
+    Ok(path)
+}
+
+pub fn render_to_image<'a>(
     base: &RgbaImage,
-    annotations: &[Annotation],
+    annotations: impl IntoIterator<Item = &'a Annotation> + Clone,
     crop: Option<eframe::egui::Rect>,
 ) -> Result<RgbaImage> {
     let mut img = base.clone();
-    composite_pixelates(&mut img, annotations);
+    composite_pixelates(&mut img, annotations.clone());
 
     let (w, h) = img.dimensions();
     let size = tiny_skia::IntSize::from_wh(w, h).context("empty image")?;

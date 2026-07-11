@@ -2,21 +2,37 @@ mod annotate;
 mod app;
 mod capture;
 mod clipboard;
+mod document;
+mod editor;
 mod export;
 mod prefs;
+mod ui;
+mod view;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 
-/// Wayland screenshot + annotation tool (portal/PipeWire capture via pinray).
+/// Wayland screenshot + annotation tool. Captures one screen per shot (raw
+/// frames over PipeWire — fast). Screens are numbered slots: the first use
+/// of a slot shows the portal's chooser once and remembers your pick.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Annotate an existing image instead of capturing the screen.
-    #[arg(long, value_name = "PATH")]
-    from_file: Option<PathBuf>,
+    /// Which screen slot to capture. The first use of a number asks you to
+    /// pick the monitor it means (the grant persists); after that it's
+    /// instant and silent.
+    #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
+    screen: u32,
+
+    /// Re-open the monitor chooser to re-bind this screen slot.
+    #[arg(long)]
+    pick_screen: bool,
+
+    /// Include the mouse cursor in the capture.
+    #[arg(long)]
+    cursor: bool,
 
     /// Seconds to wait before capturing (to set up menus etc.).
     #[arg(long, default_value_t = 0)]
@@ -24,24 +40,11 @@ struct Cli {
 
     /// Directory screenshots are saved into.
     #[arg(long, value_name = "DIR")]
-    output: Option<PathBuf>,
+    save_path: Option<PathBuf>,
 
-    /// Include the mouse cursor in the capture.
-    #[arg(long)]
-    cursor: bool,
-
-    /// Re-open the portal's monitor chooser instead of reusing the saved
-    /// grant (use this to capture a different screen).
-    #[arg(long)]
-    pick_monitor: bool,
-
-    /// Start with the whole screen already selected.
-    #[arg(long, conflicts_with = "region")]
-    full: bool,
-
-    /// Start --from-file images with no region selected.
-    #[arg(long)]
-    region: bool,
+    /// Annotate an existing image instead of capturing the screen.
+    #[arg(long, value_name = "PATH")]
+    from_file: Option<PathBuf>,
 }
 
 fn default_output_dir() -> PathBuf {
@@ -98,8 +101,10 @@ fn demo_base() -> image::RgbaImage {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // Docs/dev hook: SCRANNOTATE_DEMO renders a canned scene (pair with
-    // SCRANNOTATE_SHOT to save a window screenshot and exit).
-    let demo = std::env::var_os("SCRANNOTATE_DEMO").is_some();
+    // SCRANNOTATE_SHOT to save a window screenshot and exit). Read once and
+    // passed down so the two layers can't disagree about demo mode.
+    let demo_mode = std::env::var("SCRANNOTATE_DEMO").ok();
+    let demo = demo_mode.is_some();
 
     let img = match &cli.from_file {
         Some(path) => image::open(path)
@@ -110,15 +115,20 @@ fn main() -> Result<()> {
             if cli.delay > 0 {
                 std::thread::sleep(std::time::Duration::from_secs(cli.delay));
             }
-            capture::capture_screenshot(cli.cursor, cli.pick_monitor)?
+            capture::capture(&capture::CaptureOptions {
+                cursor: cli.cursor,
+                pick_screen: cli.pick_screen,
+                screen: cli.screen,
+            })?
         }
     };
-    let out_dir = cli.output.unwrap_or_else(default_output_dir);
+    let out_dir = cli.save_path.unwrap_or_else(default_output_dir);
 
     // Everything happens in one fullscreen frozen-frame view. Fresh captures
-    // start with no region (drag one out); --full and --from-file start with
-    // the whole image selected so the toolbar is up immediately.
-    let select_full = (cli.from_file.is_some() && !cli.region) || cli.full;
+    // start with no region (drag one out; Enter still copies the whole
+    // screen); --from-file images open with everything selected so the
+    // toolbar is up immediately.
+    let select_full = cli.from_file.is_some();
 
     let mut viewport = eframe::egui::ViewportBuilder::default()
         .with_app_id("scrannotate")
@@ -134,7 +144,7 @@ fn main() -> Result<()> {
         "scrannotate",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, cli.cursor)))
+            Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, demo_mode)))
         }),
     )
     .map_err(|err| anyhow!("running ui: {err}"))

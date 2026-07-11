@@ -1,4 +1,8 @@
-//! Single-frame screen capture via pinray (XDG portal + PipeWire on Wayland).
+//! Single-monitor frame capture via pinray (ScreenCast portal + PipeWire):
+//! raw RGBA frames over shared memory, no encoding, no disk.
+//!
+//! Each screen *slot* persists its own portal grant (restore token), so
+//! `--screen N` shows the chooser once per slot and is silent after that.
 //!
 //! pinray 0.2.4 requests a persistent portal grant and receives a restore
 //! token back, but only logs it (`tracing::info!(restore_token = ...)`)
@@ -19,15 +23,24 @@ use tracing::field::{Field, Visit};
 use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 
-fn token_path() -> Option<PathBuf> {
-    Some(crate::prefs::state_dir()?.join("restore_token"))
+fn token_path(slot: u32) -> Option<PathBuf> {
+    // Slot 1 keeps the historical name so existing grants stay bound.
+    let name = if slot <= 1 {
+        "restore_token".to_owned()
+    } else {
+        format!("restore_token_{slot}")
+    };
+    Some(crate::prefs::state_dir()?.join(name))
 }
 
-fn load_token() -> Option<String> {
-    let path = token_path()?;
+fn load_token(slot: u32) -> Option<String> {
+    let path = token_path(slot)?;
     let token = std::fs::read_to_string(&path)
         .ok()
         .or_else(|| {
+            if slot > 1 {
+                return None;
+            }
             // Migrate from the pre-rename state dir (screencap).
             let legacy = path.parent()?.parent()?.join("screencap/restore_token");
             std::fs::read_to_string(legacy).ok()
@@ -36,8 +49,8 @@ fn load_token() -> Option<String> {
     (!token.is_empty()).then_some(token)
 }
 
-fn store_token(token: &str) {
-    let Some(path) = token_path() else { return };
+fn store_token(slot: u32, token: &str) {
+    let Some(path) = token_path(slot) else { return };
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -83,11 +96,11 @@ impl<S: tracing::Subscriber> Layer<S> for TokenCatcher {
     }
 }
 
-/// Grab one frame from a display. The portal dialog lets the user pick a
-/// monitor; the granted choice is persisted via a restore token, so pass
-/// `pick_monitor` to ignore it and get the chooser again (the new grant
-/// replaces the stored token). Blocks until the user answers the dialog.
-pub fn capture_screenshot(embed_cursor: bool, pick_monitor: bool) -> Result<RgbaImage> {
+/// Grab one frame from the display bound to screen `slot`. The first use of
+/// a slot shows the portal's monitor chooser and persists the grant under
+/// that slot's restore token; pass `pick_screen` to re-open the chooser and
+/// re-bind the slot. Blocks until the user answers the dialog.
+pub fn capture_screenshot(embed_cursor: bool, pick_screen: bool, slot: u32) -> Result<RgbaImage> {
     let caught = Arc::new(Mutex::new(None));
     let subscriber = tracing_subscriber::registry().with(TokenCatcher { slot: caught.clone() });
     let _guard = tracing::subscriber::set_default(subscriber);
@@ -103,7 +116,7 @@ pub fn capture_screenshot(embed_cursor: bool, pick_monitor: bool) -> Result<Rgba
         .frame_rate(Some(10))
         .cursor_mode(if embed_cursor { CursorMode::Embedded } else { CursorMode::Hidden });
     let mut used_token = false;
-    if !pick_monitor && let Some(token) = load_token() {
+    if !pick_screen && let Some(token) = load_token(slot) {
         builder = builder.restore_token(token);
         used_token = true;
     }
@@ -125,7 +138,7 @@ pub fn capture_screenshot(embed_cursor: bool, pick_monitor: bool) -> Result<Rgba
     session.stop().ok();
 
     if let Some(token) = caught.lock().expect("token slot poisoned").take() {
-        store_token(&token);
+        store_token(slot, &token);
     }
 
     let frame = frame?;

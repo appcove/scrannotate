@@ -107,6 +107,13 @@ pub fn marker_radius(style: &Style) -> f32 {
     style.font_size * 0.9
 }
 
+/// A marker drag too short to clear the circle is a plain drop. One rule for
+/// the live preview and the committed shape, so they can't disagree.
+pub fn marker_target(pos: Pos2, target: Option<Pos2>, style: &Style) -> Option<Pos2> {
+    let min_len = marker_radius(style) * 1.6;
+    target.filter(|t| (*t - pos).length() >= min_len)
+}
+
 /// Block size for pixelation, derived from the image so the effect reads the
 /// same on HiDPI screenshots and small crops alike.
 pub fn pixelate_block(img_w: u32, img_h: u32) -> u32 {
@@ -163,7 +170,10 @@ pub fn apply_pixelate(img: &mut RgbaImage, rect: Rect, block: u32) {
 }
 
 /// Apply every pixelate annotation onto `img`.
-pub fn composite_pixelates(img: &mut RgbaImage, annotations: &[Annotation]) {
+pub fn composite_pixelates<'a>(
+    img: &mut RgbaImage,
+    annotations: impl IntoIterator<Item = &'a Annotation>,
+) {
     let (w, h) = img.dimensions();
     let block = pixelate_block(w, h);
     for ann in annotations {
@@ -175,9 +185,9 @@ pub fn composite_pixelates(img: &mut RgbaImage, annotations: &[Annotation]) {
 
 /// The pixelate regions currently in `annotations`, used to detect when the
 /// composited base texture must be rebuilt.
-pub fn pixelate_rects(annotations: &[Annotation]) -> Vec<Rect> {
+pub fn pixelate_rects<'a>(annotations: impl IntoIterator<Item = &'a Annotation>) -> Vec<Rect> {
     annotations
-        .iter()
+        .into_iter()
         .filter_map(|a| match &a.shape {
             Shape::Pixelate { rect } => Some(*rect),
             _ => None,

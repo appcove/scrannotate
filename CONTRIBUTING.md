@@ -42,6 +42,17 @@ cargo test
 cargo clippy --all-targets
 ```
 
+PipeWire is only required by the `screencast` cargo feature (on by
+default — it is the capture backend). On a machine without
+`libpipewire-0.3-dev`, develop against the capture-less build (only
+`--from-file` and the demo mode work):
+
+```
+cargo build --no-default-features
+cargo test --no-default-features
+cargo clippy --all-targets --no-default-features
+```
+
 Please keep `cargo clippy --all-targets` warning-free and `cargo test`
 green; match the style of the surrounding code.
 
@@ -51,7 +62,6 @@ The annotator can be exercised without a live capture:
 
 ```
 cargo run -- --from-file some.png            # whole image preselected
-cargo run -- --from-file some.png --region   # start at region selection
 ```
 
 ## Regenerating the README screenshots
