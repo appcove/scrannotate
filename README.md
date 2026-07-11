@@ -202,4 +202,4 @@ project is distributed under Apache 2.0).
 
 ## License
 
-[Apache License 2.0](LICENSE) — Copyright 2026 Jason Garber.
+[Apache License 2.0](LICENSE) — Copyright 2026 AppCove, Inc.

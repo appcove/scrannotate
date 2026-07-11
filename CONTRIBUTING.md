@@ -8,7 +8,7 @@ ideas, and pull requests are all welcome.
 By submitting a contribution to this project (a pull request, patch, code
 snippet in an issue, or any other material intended for inclusion), **you
 irrevocably assign all right, title, and interest in and to that
-contribution — including its copyright — to Jason Garber**, and you:
+contribution — including its copyright — to AppCove, Inc.**, and you:
 
 1. represent that the contribution is your own original work (or that you
    otherwise have the right to assign it), and that it is not subject to any
