@@ -14,7 +14,7 @@ image encoding, no disk round-trip, so the editor is up in a blink. Select,
 annotate, and ship — copy to the clipboard or save a PNG — without ever
 leaving that one surface. No editor window, no dialogs, no save prompts.
 
-![Annotating a capture: region selection, arrow, box, highlight, blur, marker, and text](docs/screenshot-annotate.png)
+![The editor over a frozen frame: numbered markers, a highlight, an ellipse, a blurred strip, a line, inline text with a penned underline, and an arrow into a selected box showing resize handles and a rotate knob](docs/screenshot-annotate.png)
 
 ## Highlights
 
@@ -109,6 +109,9 @@ hotkeys to taste: `Print` → `scrannotate`, `Shift+Print` →
    two per row, Arrow/Text/Marker/Line first. Pick one and draw. Markers
    drop with a click, or drag one to pull an arrow out of it. Text is typed
    inline; Shift+Enter for new lines.
+
+   ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line explaining Enter, Shift+Enter, and Esc](docs/screenshot-text.png)
+
 3. **Refine** — tap `Space` (or `S`) for the Select tool: hover highlights
    what's clickable; click to select, drag to move, handles resize, the
    curved-arrow knob rotates, the four-arrow knob moves text, `Del`
@@ -116,6 +119,9 @@ hotkeys to taste: `Print` → `scrannotate`, `Shift+Print` →
    or removes one item, `Ctrl+A` selects everything); moving, restyling,
    and deleting apply to the whole selection. The settings panel edits
    whatever is selected — or the defaults when nothing is.
+
+   ![A multi-selection: three annotations outlined with dashed boxes, the settings panel targeting "For 3 Selected", and the status line listing what the selection affords](docs/screenshot-multiselect.png)
+
 4. **Ship** — `Enter`/`Ctrl+C` copies the region and closes; `Ctrl+S` saves
    a PNG and closes; the toolbar also has plain Copy/Save buttons that keep
    the editor open. `Esc Esc` discards everything, no questions asked.

@@ -134,8 +134,9 @@ fn main() -> Result<()> {
         .with_app_id("scrannotate")
         .with_title("scrannotate");
     viewport = if demo {
-        // Windowed, deterministic size for docs screenshots (run under Xvfb).
-        viewport.with_inner_size([1680.0, 1160.0])
+        // Windowed, deterministic size for docs screenshots; exactly the
+        // demo image's size, so the frame fills the canvas edge to edge.
+        viewport.with_inner_size([1600.0, 1000.0])
     } else {
         viewport.with_fullscreen(true)
     };

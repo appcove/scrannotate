@@ -66,18 +66,25 @@ cargo run -- --from-file some.png            # whole image preselected
 
 ## Regenerating the README screenshots
 
-Screenshots are produced from a deterministic built-in demo scene, rendered
-headlessly under Xvfb:
+Screenshots come from deterministic built-in demo scenes.
+`SCRANNOTATE_DEMO=<mode>` seeds a canned scene — `annotate`, `multiselect`,
+`text`, or `picker`, one per README image — and `SCRANNOTATE_SHOT=<path>`
+saves a window screenshot once the UI settles, then exits. Demo mode never
+reads or writes the user's preferences. Regenerate all four with:
+
+```
+for mode in annotate multiselect text picker; do
+    SCRANNOTATE_DEMO=$mode SCRANNOTATE_SHOT=docs/screenshot-$mode.png \
+        cargo run
+done
+```
+
+Any session that can open a window works (capture isn't involved, so
+`--no-default-features` is fine too). On a headless machine, render under
+Xvfb — unset `WAYLAND_DISPLAY` so winit picks X11:
 
 ```
 sudo apt install xvfb mesa-vulkan-drivers
 Xvfb :99 -screen 0 1920x1200x24 -ac -nolisten tcp &
-DISPLAY=:99 SCRANNOTATE_DEMO=annotate SCRANNOTATE_SHOT=docs/screenshot-annotate.png \
-    cargo run   # unset WAYLAND_DISPLAY so winit picks X11
-DISPLAY=:99 SCRANNOTATE_DEMO=picker SCRANNOTATE_SHOT=docs/screenshot-picker.png \
-    cargo run
+DISPLAY=:99 SCRANNOTATE_DEMO=annotate ... cargo run
 ```
-
-`SCRANNOTATE_DEMO=annotate|picker` seeds the canned scene;
-`SCRANNOTATE_SHOT=<path>` saves a window screenshot once the UI settles and
-exits. Demo mode never reads or writes the user's preferences.

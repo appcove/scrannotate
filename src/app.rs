@@ -103,62 +103,83 @@ impl ScreencapApp {
         app
     }
 
-    /// Canned scene for the README screenshots
-    /// (`SCRANNOTATE_DEMO=annotate|picker`).
+    /// Canned scenes for the README screenshots
+    /// (`SCRANNOTATE_DEMO=annotate|multiselect|text|picker`). One shared
+    /// document places every tool's output on the synthetic desktop; the
+    /// modes differ only in what is selected, mid-edit, or popped up.
     fn seed_demo(&mut self, mode: &str) {
         let style = |color, width: f32, font_size: f32| Style { color, width, font_size };
-        let red = PALETTE[0];
+        let rect = |x0: f32, y0: f32, x1: f32, y1: f32| {
+            Rect::from_min_max(Pos2::new(x0, y0), Pos2::new(x1, y1))
+        };
+        let [red, yellow, green, blue, ..] = PALETTE;
         self.editor.style = style(red, 5.0, 36.0);
-        self.editor.doc.region =
-            Some(Rect::from_min_max(Pos2::new(430.0, 70.0), Pos2::new(1560.0, 950.0)));
-        let annotations = vec![
-            Annotation::new(
-                Shape::Rect {
-                    rect: Rect::from_min_max(Pos2::new(1108.0, 740.0), Pos2::new(1372.0, 850.0)),
-                },
-                style(red, 5.0, 36.0),
-            ),
-            Annotation::new(
-                Shape::Arrow { a: Pos2::new(880.0, 560.0), b: Pos2::new(1090.0, 760.0) },
-                style(red, 5.0, 36.0),
-            ),
-            Annotation::new(
-                Shape::Highlight {
-                    rect: Rect::from_min_max(Pos2::new(532.0, 276.0), Pos2::new(1180.0, 322.0)),
-                },
-                style(PALETTE[1], 5.0, 36.0),
-            ),
-            Annotation::new(
-                Shape::Pixelate {
-                    rect: Rect::from_min_max(Pos2::new(532.0, 404.0), Pos2::new(1010.0, 464.0)),
-                },
-                style(red, 5.0, 36.0),
-            ),
-            Annotation::new(
-                Shape::Marker {
-                    pos: Pos2::new(492.0, 232.0),
-                    number: 1,
-                    target: Some(Pos2::new(556.0, 292.0)),
-                },
-                style(PALETTE[3], 4.0, 26.0),
-            ),
-            Annotation::new(
-                Shape::Text { pos: Pos2::new(560.0, 596.0), text: "Ship this build!".to_owned() },
-                style(red, 5.0, 44.0),
-            ),
-        ];
-        let mut first = None;
-        for ann in annotations {
-            let id = self.editor.doc.push(ann);
-            first.get_or_insert(id);
-        }
-        self.editor.doc.marker_next = 2;
+        self.editor.doc.region = Some(rect(430.0, 70.0, 1560.0, 950.0));
+
+        // One annotation per tool, tied to the synthetic desktop's furniture.
+        let doc = &mut self.editor.doc;
+        doc.push(Annotation::new(
+            Shape::Marker {
+                pos: Pos2::new(492.0, 232.0),
+                number: 1,
+                target: Some(Pos2::new(556.0, 292.0)),
+            },
+            style(blue, 4.0, 26.0),
+        ));
+        doc.push(Annotation::new(
+            Shape::Highlight { rect: rect(532.0, 276.0, 1180.0, 322.0) },
+            style(yellow, 5.0, 36.0),
+        ));
+        doc.push(Annotation::new(
+            Shape::Ellipse { rect: rect(880.0, 330.0, 1060.0, 392.0) },
+            style(green, 5.0, 36.0),
+        ));
+        doc.push(Annotation::new(
+            Shape::Marker { pos: Pos2::new(492.0, 434.0), number: 2, target: None },
+            style(blue, 4.0, 26.0),
+        ));
+        doc.push(Annotation::new(
+            Shape::Pixelate { rect: rect(532.0, 404.0, 1010.0, 464.0) },
+            style(red, 5.0, 36.0),
+        ));
+        doc.push(Annotation::new(
+            Shape::Line { a: Pos2::new(540.0, 514.0), b: Pos2::new(1170.0, 514.0) },
+            style(blue, 5.0, 36.0),
+        ));
+        let text = doc.push(Annotation::new(
+            Shape::Text { pos: Pos2::new(560.0, 596.0), text: "Ship this build!".to_owned() },
+            style(red, 5.0, 44.0),
+        ));
+        // A hand-drawn wavy underline beneath the text.
+        let points = (0..=33u8)
+            .map(|i| {
+                let x = 565.0 + f32::from(i) * 10.0;
+                Pos2::new(x, 668.0 + 6.0 * (x / 18.0).sin())
+            })
+            .collect();
+        doc.push(Annotation::new(Shape::Pen { points }, style(green, 4.0, 36.0)));
+        let arrow = doc.push(Annotation::new(
+            Shape::Arrow { a: Pos2::new(880.0, 560.0), b: Pos2::new(1090.0, 760.0) },
+            style(red, 5.0, 36.0),
+        ));
+        let boxed = doc.push(Annotation::new(
+            Shape::Rect { rect: rect(1108.0, 740.0, 1372.0, 850.0) },
+            style(red, 5.0, 36.0),
+        ));
+        doc.marker_next = 3;
+
         self.editor.tool = Tool::Select;
-        if let Some(id) = first {
-            self.editor.selected.insert(id);
-        }
-        if mode == "picker" {
-            self.editor.color_picker = Some(self.editor.style.color);
+        match mode {
+            // Group chrome and the "For 3 Selected" settings target.
+            "multiselect" => self.editor.selected.extend([text, arrow, boxed]),
+            // The inline text editor open on the text, caret and all.
+            "text" => self.editor.open_text_editor(text),
+            _ => {
+                self.editor.selected.insert(boxed);
+                if mode == "picker" {
+                    self.editor.color_picker = Some(self.editor.style.color);
+                }
+            }
         }
     }
 
