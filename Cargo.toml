@@ -1,6 +1,6 @@
 [package]
 name = "scrannotate"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 description = "Screenshot annotation tool: capture a screen, select, annotate in place, copy or save"
 license = "Apache-2.0"
