@@ -47,6 +47,21 @@ pub fn annotation_bbox(ann: &Annotation, measure: Measure) -> Rect {
     }
 }
 
+/// Bounding box of an annotation's drawn pixels — stroke included — in image
+/// coords, ignoring rotation. It differs from [`annotation_bbox`] only for the
+/// outline shapes whose stroke straddles the geometric rect (Rect, Ellipse are
+/// drawn with the stroke centered on the edge); every other shape already
+/// bounds its own ink. Chrome (selection boxes, hover outline) uses this so it
+/// sits outside the shape instead of running through the stroke, while
+/// handles, resizing, and hit-testing keep the geometric [`annotation_bbox`].
+pub fn outer_bbox(ann: &Annotation, measure: Measure) -> Rect {
+    let bbox = annotation_bbox(ann, measure);
+    match ann.shape {
+        Shape::Rect { .. } | Shape::Ellipse { .. } => bbox.expand(ann.style.width * 0.5),
+        _ => bbox,
+    }
+}
+
 /// Whether `p` (image coords) lands on the annotation's visible geometry.
 pub fn hit_annotation(p: Pos2, ann: &Annotation, bbox: Rect, zoom: f32) -> bool {
     let tol = ann.style.width * 0.5 + 6.0 / zoom;

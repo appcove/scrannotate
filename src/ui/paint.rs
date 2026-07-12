@@ -15,7 +15,7 @@ use crate::editor::geometry::{
     ITEM_HANDLE_SIZE, KNOB_RADIUS, REGION_GRIP_RADIUS, REGION_HANDLE_SIZE, region_move_grip,
     rotate_around, selection_handles, subtract_rect,
 };
-use crate::editor::hit::{Measure, annotation_bbox, item_handles};
+use crate::editor::hit::{Measure, item_handles, outer_bbox};
 use crate::editor::state::{EditorState, ItemDragKind};
 use crate::ui::ACCENT;
 use crate::view::View;
@@ -194,8 +194,14 @@ pub fn paint_drag_preview(painter: &egui::Painter, editor: &Editor, canvas: Rect
     }
 }
 
-/// A dotted selection box around `bbox` (image coords), rotated by `rotation`.
+/// Screen-px the dotted selection box sits outside the shape's ink, so it
+/// reads as a frame around the shape rather than a line drawn over it.
+const SELECTION_GAP: f32 = 3.0;
+
+/// A dotted selection box a hair outside `bbox` (image coords), rotated by
+/// `rotation`.
 fn dashed_box(painter: &egui::Painter, view: &View, canvas: Rect, bbox: Rect, rotation: f32) {
+    let bbox = bbox.expand(SELECTION_GAP / view.zoom);
     let corners = rotated_screen_corners(view, canvas, bbox, rotation);
     for i in 0..4 {
         painter.extend(EguiShape::dashed_line(
@@ -235,7 +241,7 @@ pub fn paint_selection_chrome(
             continue;
         }
         let Some(ann) = editor.doc.get(*id) else { continue };
-        dashed_box(painter, &editor.view, canvas, annotation_bbox(ann, measure), ann.rotation);
+        dashed_box(painter, &editor.view, canvas, outer_bbox(ann, measure), ann.rotation);
         if single != Some(*id) {
             continue;
         }
@@ -270,7 +276,7 @@ pub fn paint_hover_outline(
     ann: &Annotation,
     measure: Measure,
 ) {
-    let bbox = annotation_bbox(ann, measure).expand(6.0 / editor.view.zoom);
+    let bbox = outer_bbox(ann, measure).expand(6.0 / editor.view.zoom);
     let pts = rotated_screen_corners(&editor.view, canvas, bbox, ann.rotation).to_vec();
     painter.add(EguiShape::closed_line(pts, Stroke::new(2.0, ACCENT.gamma_multiply(0.6))));
 }
