@@ -194,42 +194,48 @@ pub fn paint_drag_preview(painter: &egui::Painter, editor: &Editor, canvas: Rect
     }
 }
 
-/// Dashed boxes around every selected item; handles and knobs only when a
-/// single item is selected.
+/// A dotted selection box around `bbox` (image coords), rotated by `rotation`.
+fn dashed_box(painter: &egui::Painter, view: &View, canvas: Rect, bbox: Rect, rotation: f32) {
+    let corners = rotated_screen_corners(view, canvas, bbox, rotation);
+    for i in 0..4 {
+        painter.extend(EguiShape::dashed_line(
+            &[corners[i], corners[(i + 1) % 4]],
+            Stroke::new(1.0, ACCENT),
+            5.0,
+            4.0,
+        ));
+    }
+}
+
+/// A dotted box around every selected item — including the text being typed —
+/// plus handles and knobs when a single item is selected.
 pub fn paint_selection_chrome(
     painter: &egui::Painter,
     editor: &Editor,
     canvas: Rect,
     measure: Measure,
 ) {
+    // The text being edited is hidden from the canvas and its stored shape is
+    // stale, so box the live buffer instead — whatever tool opened the editor,
+    // and unrotated, to match the inline editor.
+    if let EditorState::TextEditing(edit) = &editor.state {
+        let bbox = Rect::from_min_size(edit.pos, measure(&edit.buffer, edit.style.font_size));
+        dashed_box(painter, &editor.view, canvas, bbox, 0.0);
+    }
+
     if editor.tool != Tool::Select {
         return;
     }
     let editing = editor.editing_target();
     let single = editor.single_selected();
     for id in &editor.selected {
+        // The editing target's box is the live one drawn above, and it shows
+        // no handles while typing.
         if editing == Some(*id) {
             continue;
         }
         let Some(ann) = editor.doc.get(*id) else { continue };
-        // Endpoint-handled shapes get no dashed bounding box when alone —
-        // their two endpoint handles are the chrome.
-        let endpoint_style = matches!(
-            ann.shape,
-            Shape::Line { .. } | Shape::Arrow { .. } | Shape::Marker { target: Some(_), .. }
-        );
-        if !(endpoint_style && single.is_some()) {
-            let bbox = annotation_bbox(ann, measure);
-            let corners = rotated_screen_corners(&editor.view, canvas, bbox, ann.rotation);
-            for i in 0..4 {
-                painter.extend(EguiShape::dashed_line(
-                    &[corners[i], corners[(i + 1) % 4]],
-                    Stroke::new(1.0, ACCENT),
-                    5.0,
-                    4.0,
-                ));
-            }
-        }
+        dashed_box(painter, &editor.view, canvas, annotation_bbox(ann, measure), ann.rotation);
         if single != Some(*id) {
             continue;
         }
