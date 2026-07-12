@@ -45,6 +45,22 @@ pub fn region_handle_at(sel_screen: Rect, pointer: Pos2) -> Option<ResizeEdges> 
         .map(|(_, edges)| edges)
 }
 
+/// Screen-px radius of the region's move grip.
+pub const REGION_GRIP_RADIUS: f32 = 11.0;
+
+/// Center (screen coords) of the region's move grip: on the top edge, just
+/// left of the top-right resize handle. It is the way to move the region now
+/// that a plain drag inside it rubber-band-selects instead.
+pub fn region_move_grip(sel_screen: Rect) -> Pos2 {
+    Pos2::new(sel_screen.right() - REGION_HANDLE_SIZE - 14.0, sel_screen.top())
+}
+
+/// Whether `pointer` (screen coords) is on the region's move grip. Checked
+/// before the resize handles, so its small zone wins where the two touch.
+pub fn region_grip_at(sel_screen: Rect, pointer: Pos2) -> bool {
+    (pointer - region_move_grip(sel_screen)).abs().max_elem() <= 14.0
+}
+
 pub fn edges_cursor(e: ResizeEdges) -> egui::CursorIcon {
     use egui::CursorIcon::*;
     match (e.left, e.right, e.top, e.bottom) {

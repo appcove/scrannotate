@@ -30,14 +30,15 @@ no save prompts.
 - **One surface, no modes to escape.** The capture fills the screen with
   full-screen crosshairs; drag out the region (its edges extend as guide
   lines while you drag) and the toolbar snaps in beside it. The region stays
-  adjustable — with its own handles — right up until you copy. The status
-  line at the toolbar's foot always explains what the current state means
-  and what a click will do.
+  adjustable — resize handles plus a move grip at its top-right — right up
+  until you copy. The status line at the toolbar's foot always explains what
+  the current state means and what a click will do.
 - **Every annotation stays live.** Nothing is baked in until export. With
   the Select tool, click any placed item to move it, resize it with handles,
-  rotate it with the knob, restyle it, or delete it. Shift+drag a rubber
-  band (or Ctrl+click) to select several and move, restyle, or delete them
-  together. Undo/redo throughout — including region changes.
+  rotate it with the knob, restyle it, or delete it. Drag a box over several
+  to select them (Shift+drag adds to the selection; Ctrl+click toggles one)
+  and move, restyle, or delete them together. Undo/redo throughout —
+  including region changes.
 - **Ten tools**: Select, Pen, Line, Arrow, Box, Ellipse, Highlight, Blur
   (pixelate), Text, and auto-numbered Markers — drag a marker and an arrow
   grows out of it (one object; each end drags independently).
@@ -161,8 +162,8 @@ display list, primary first. Bind hotkeys to taste: `Print` →
 1. **Select** — the frozen frame appears with a crosshair under the cursor.
    Drag out the region; while dragging, the box edges extend across the
    whole screen so you can align both corners precisely. The region can be
-   redrawn at any time (right-drag, with any tool) and moved or resized by
-   its handles with the Select tool.
+   redrawn at any time (right-drag, with any tool), moved by the grip at its
+   top-right, or resized by its handles with the Select tool.
 2. **Annotate** — the toolbar (draggable by its `• • •` grip) has the tools
    two per row, Arrow/Text/Marker/Line first. Pick one and draw. Markers
    drop with a click, or drag one to pull an arrow out of it. Text is typed
@@ -171,12 +172,13 @@ display list, primary first. Bind hotkeys to taste: `Print` →
    ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line explaining Enter, Shift+Enter, and Esc](docs/screenshot-text.png)
 
 3. **Refine** — tap `Space` (or `S`) for the Select tool: hover highlights
-   what's clickable; click to select, drag to move, handles resize, the
-   curved-arrow knob rotates, the four-arrow knob moves text, `Del`
-   deletes. `Shift+drag` rubber-bands a multi-selection (`Ctrl+click` adds
-   or removes one item, `Ctrl+A` selects everything); moving, restyling,
-   and deleting apply to the whole selection. The settings panel edits
-   whatever is selected — or the defaults when nothing is.
+   what's clickable; click an item to select it, drag an item to move it,
+   drag empty space to rubber-band a selection box around several, handles
+   resize, the curved-arrow knob rotates, the four-arrow knob moves text,
+   `Del` deletes. `Shift+drag` adds the box's contents to the selection
+   (`Ctrl+click` toggles one item, `Ctrl+A` selects everything); moving,
+   restyling, and deleting apply to the whole selection. The settings panel
+   edits whatever is selected — or the defaults when nothing is.
 
    ![A multi-selection: three annotations outlined with dashed boxes, the settings panel targeting "For 3 Selected", and the status line listing what the selection affords](docs/screenshot-multiselect.png)
 
@@ -194,13 +196,14 @@ On macOS, `Ctrl` in this table is the `⌘` Command key.
 | Pen | `P` | | Save & close | `Ctrl+S` |
 | Line | `L` | | Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Arrow | `A` | | Delete selection | `Del` / `Backspace` |
-| Box | `R` | | Multi-select | `Shift`+drag / `Ctrl`+click |
-| Ellipse | `E` | | Select all | `Ctrl+A` |
-| Highlight | `H` | | Reset view | `F` |
-| Blur | `B` | | Cancel op → clear selection → Select tool → `Esc` `Esc` discards | `Esc` |
-| Text | `T` | | Quit | `Ctrl+Q` |
-| Marker | `M` | | Zoom / Pan | scroll / middle drag, `Space`+drag |
-| | | | New region | right drag |
+| Box | `R` | | Select box (Shift adds) | drag / `Shift`+drag |
+| Ellipse | `E` | | Toggle one in/out of selection | `Ctrl`+click |
+| Highlight | `H` | | Select all | `Ctrl+A` |
+| Blur | `B` | | Reset view | `F` |
+| Text | `T` | | Cancel op → clear selection → Select tool → `Esc` `Esc` discards | `Esc` |
+| Marker | `M` | | Quit | `Ctrl+Q` |
+| | | | Zoom / Pan | scroll / middle drag, `Space`+drag |
+| | | | Move region / New region | top-right grip / right drag |
 | | | | Reset all (back to region select) | `Shift+Esc` |
 
 ### The color picker

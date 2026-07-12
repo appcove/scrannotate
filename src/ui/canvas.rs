@@ -9,7 +9,7 @@ use eframe::egui::{
 
 use crate::annotate::Tool;
 use crate::editor::Editor;
-use crate::editor::geometry::{edges_cursor, region_handle_at};
+use crate::editor::geometry::{edges_cursor, region_grip_at, region_handle_at};
 use crate::editor::state::{EditorState, ItemDragKind, RegionMode};
 use crate::ui::paint;
 
@@ -159,14 +159,18 @@ pub fn show(ui: &mut Ui, editor: &mut Editor, texture: Option<&TextureHandle>) -
                         ItemDragKind::Endpoint { .. } => egui::CursorIcon::Crosshair,
                     }
                 } else if editor.tool == Tool::Select
+                    && sel_screen.is_some_and(|ss| region_grip_at(ss, pos))
+                {
+                    egui::CursorIcon::Move
+                } else if editor.tool == Tool::Select
                     && let Some(edges) = sel_screen.and_then(|ss| region_handle_at(ss, pos))
                 {
                     edges_cursor(edges)
                 } else if editor.tool == Tool::Select {
+                    // A plain drag rubber-band-selects (crosshair); only an
+                    // item under the pointer offers a move.
                     if hovered_item.is_some() {
                         egui::CursorIcon::Move
-                    } else if sel_screen.is_some_and(|ss| ss.contains(pos)) {
-                        egui::CursorIcon::Grab
                     } else {
                         egui::CursorIcon::Crosshair
                     }

@@ -138,12 +138,12 @@ impl Editor {
                     Tool::Select if !self.selected.is_empty() => (
                         StatusKind::Hint,
                         format!(
-                            "{} selected · drag: move · Del: delete · Ctrl+click: add/remove · Esc: deselect",
+                            "{} selected · drag: move · Shift+drag: add · Del: delete · Esc: deselect",
                             self.selected.len()
                         ),
                     ),
                     Tool::Select => hint(
-                        "Click an item to select · Shift+drag: multi-select · drag empty space: new region",
+                        "Drag a box to select · Shift+drag: add · click an item · right-drag: new region",
                     ),
                     Tool::Text => hint("Click to place text · click existing text to edit it"),
                     Tool::Marker => (
@@ -498,24 +498,30 @@ impl Editor {
                 };
                 return;
             }
-            // 2. Region handles.
-            if let Some(region) = self.doc.region
-                && let Some(edges) = geometry::region_handle_at(
-                    self.view.rect_to_screen(canvas, region),
-                    screen,
-                )
-            {
-                self.doc.begin();
-                self.state = EditorState::RegionAdjust {
-                    start_rect: region,
-                    mode: RegionMode::Resize { edges },
-                };
-                return;
+            // 2. Region move grip, then resize handles.
+            if let Some(region) = self.doc.region {
+                let ss = self.view.rect_to_screen(canvas, region);
+                if geometry::region_grip_at(ss, screen) {
+                    self.doc.begin();
+                    self.state = EditorState::RegionAdjust {
+                        start_rect: region,
+                        mode: RegionMode::Move { grab: p },
+                    };
+                    return;
+                }
+                if let Some(edges) = geometry::region_handle_at(ss, screen) {
+                    self.doc.begin();
+                    self.state = EditorState::RegionAdjust {
+                        start_rect: region,
+                        mode: RegionMode::Resize { edges },
+                    };
+                    return;
+                }
             }
-            // 3. Shift+drag: multi-select rubber band (Ctrl keeps existing).
+            // 3. Shift+drag adds to the selection; the plain drag in rung 5
+            //    replaces it. Both rubber-band.
             if mods.shift {
-                self.state =
-                    EditorState::RubberBand { anchor: p, current: p, additive: mods.command };
+                self.state = EditorState::RubberBand { anchor: p, current: p, additive: true };
                 return;
             }
             // 4. Drag an item: the whole selection moves together.
@@ -548,18 +554,15 @@ impl Editor {
                 };
                 return;
             }
-            // 5. Inside the region box: move it. Outside: draw a new one.
-            if let Some(region) = self.doc.region
-                && self.view.rect_to_screen(canvas, region).contains(screen)
-            {
-                self.doc.begin();
-                self.state = EditorState::RegionAdjust {
-                    start_rect: region,
-                    mode: RegionMode::Move { grab: p },
-                };
-                return;
+            // 5. Empty space. With no region yet, the first drag draws one
+            //    (the capture-setup flow); once a region exists, a plain drag
+            //    rubber-band-selects — replacing the selection. Move the
+            //    region with its grip (rung 2), redraw it with a right-drag.
+            if self.doc.region.is_none() {
+                self.begin_region_draw(clamped);
+            } else {
+                self.state = EditorState::RubberBand { anchor: p, current: p, additive: false };
             }
-            self.begin_region_draw(clamped);
             return;
         }
 
@@ -1094,6 +1097,91 @@ mod tests {
         ed.undo();
         assert_eq!(ed.doc.annotations().len(), 3);
         assert!(ed.selected.is_empty()); // pruned, not dangling
+    }
+
+    #[test]
+    fn plain_drag_on_empty_rubber_bands_and_replaces() {
+        let mut ed = editor();
+        let a = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(130.0, 130.0)));
+        let b = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(150.0, 100.0), Pos2::new(180.0, 130.0)));
+        let far = add_highlight(
+            &mut ed,
+            Rect::from_min_max(Pos2::new(400.0, 400.0), Pos2::new(420.0, 420.0)),
+        );
+        // A region already exists, so a plain drag selects rather than
+        // drawing a new region.
+        ed.doc.region = Some(ed.doc.image_rect());
+        ed.set_tool(Tool::Select);
+        ed.selected.insert(far); // must be cleared by the non-additive band
+        // Empty-space start: no item, no region handle, no grip.
+        ed.primary_drag_start(
+            Pos2::new(90.0, 90.0),
+            Pos2::new(90.0, 90.0),
+            canvas(),
+            Modifiers::NONE,
+            &measure,
+        );
+        assert!(matches!(ed.state, EditorState::RubberBand { additive: false, .. }));
+        ed.pointer_moved(Pos2::new(200.0, 200.0));
+        ed.pointer_up(&measure);
+        assert!(ed.selected.contains(&a) && ed.selected.contains(&b));
+        assert!(!ed.selected.contains(&far), "a plain band replaces the selection");
+    }
+
+    #[test]
+    fn plain_drag_draws_region_when_none_exists() {
+        let mut ed = editor();
+        assert!(ed.doc.region.is_none());
+        ed.primary_drag_start(
+            Pos2::new(50.0, 50.0),
+            Pos2::new(50.0, 50.0),
+            canvas(),
+            Modifiers::NONE,
+            &measure,
+        );
+        // With no region yet, the first drag is still the capture-setup flow.
+        assert!(matches!(ed.state, EditorState::RegionDraw { .. }));
+    }
+
+    #[test]
+    fn shift_drag_adds_to_the_selection() {
+        let mut ed = editor();
+        let a = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(130.0, 130.0)));
+        let b = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(150.0, 100.0), Pos2::new(180.0, 130.0)));
+        ed.set_tool(Tool::Select);
+        ed.selected.insert(a);
+        // Shift+drag a band over b only (well clear of a's handles).
+        ed.primary_drag_start(
+            Pos2::new(200.0, 200.0),
+            Pos2::new(200.0, 200.0),
+            canvas(),
+            Modifiers::SHIFT,
+            &measure,
+        );
+        assert!(matches!(ed.state, EditorState::RubberBand { additive: true, .. }));
+        ed.pointer_moved(Pos2::new(155.0, 105.0));
+        ed.pointer_up(&measure);
+        assert!(ed.selected.contains(&a), "shift keeps the existing selection");
+        assert!(ed.selected.contains(&b), "shift adds the band's contents");
+    }
+
+    #[test]
+    fn region_move_grip_moves_the_region() {
+        let mut ed = editor();
+        let region = Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(300.0, 200.0));
+        ed.doc.region = Some(region);
+        ed.set_tool(Tool::Select);
+        // View is 1:1 with no pan in tests, so screen coords equal image
+        // coords: the grip sits at the same point on both.
+        let grip = geometry::region_move_grip(region);
+        ed.primary_drag_start(grip, grip, canvas(), Modifiers::NONE, &measure);
+        assert!(matches!(
+            ed.state,
+            EditorState::RegionAdjust { mode: RegionMode::Move { .. }, .. }
+        ));
+        ed.pointer_moved(grip + Vec2::new(20.0, 20.0));
+        ed.pointer_up(&measure);
+        assert_eq!(ed.doc.region, Some(region.translate(Vec2::new(20.0, 20.0))));
     }
 
     #[test]

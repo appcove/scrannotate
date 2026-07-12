@@ -12,8 +12,8 @@ use crate::annotate::{
 };
 use crate::editor::Editor;
 use crate::editor::geometry::{
-    ITEM_HANDLE_SIZE, KNOB_RADIUS, REGION_HANDLE_SIZE, rotate_around, selection_handles,
-    subtract_rect,
+    ITEM_HANDLE_SIZE, KNOB_RADIUS, REGION_GRIP_RADIUS, REGION_HANDLE_SIZE, region_move_grip,
+    rotate_around, selection_handles, subtract_rect,
 };
 use crate::editor::hit::{Measure, annotation_bbox, item_handles};
 use crate::editor::state::{EditorState, ItemDragKind};
@@ -304,6 +304,12 @@ pub fn paint_region(painter: &egui::Painter, editor: &Editor, canvas: Rect) {
                     StrokeKind::Middle,
                 );
             }
+            // Move grip, just left of the top-right handle: a plain drag now
+            // rubber-band-selects, so the region moves from here instead.
+            let grip = region_move_grip(ss);
+            painter.circle_filled(grip, REGION_GRIP_RADIUS, ACCENT);
+            painter.circle_stroke(grip, REGION_GRIP_RADIUS, Stroke::new(1.5, Color32::WHITE));
+            paint_move_icon(painter, grip, 6.0, Color32::WHITE);
         }
         let dims = format!("{}×{}", region.width().round(), region.height().round());
         let (pos, align) = if ss.min.y - canvas.min.y > 24.0 {
