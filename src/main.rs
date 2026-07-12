@@ -1,3 +1,8 @@
+// A GUI app must not flash a console window on every hotkey launch; main()
+// reattaches to a parent terminal so CLI output still works. (Not under
+// cfg(test): the test harness needs a console.)
+#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
+
 mod annotate;
 mod app;
 mod capture;
@@ -14,19 +19,22 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 
-/// Wayland screenshot + annotation tool. Captures one screen per shot (raw
-/// frames over PipeWire — fast). Screens are numbered slots: the first use
-/// of a slot shows the portal's chooser once and remembers your pick.
+/// Screenshot + annotation tool. Captures one screen per shot as a raw
+/// frame (no encoding, no disk round-trip — fast) and edits it in place.
+/// Screens are numbered: on Linux/Wayland the first use of a number shows
+/// the portal's chooser once and remembers your pick; on macOS and Windows
+/// numbers simply follow the display list (--pick-screen shows it).
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Which screen slot to capture. The first use of a number asks you to
-    /// pick the monitor it means (the grant persists); after that it's
-    /// instant and silent.
+    /// Which screen to capture. Linux: the first use of a number asks you
+    /// to pick the monitor it means (the grant persists). macOS/Windows:
+    /// the Nth display, primary first.
     #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     screen: u32,
 
-    /// Re-open the monitor chooser to re-bind this screen slot.
+    /// Linux: re-open the monitor chooser to re-bind this screen slot.
+    /// macOS/Windows: list the numbered screens and exit.
     #[arg(long)]
     pick_screen: bool,
 
@@ -99,6 +107,15 @@ fn demo_base() -> image::RgbaImage {
 }
 
 fn main() -> Result<()> {
+    // The windows-subsystem binary detaches from any console; reattach to
+    // the parent's so --help/--pick-screen/save-path output still shows
+    // when run from a terminal (a no-op under a hotkey/shortcut launch).
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+
     let cli = Cli::parse();
     // Docs/dev hook: SCRANNOTATE_DEMO renders a canned scene (pair with
     // SCRANNOTATE_SHOT to save a window screenshot and exit). Read once and
@@ -106,20 +123,32 @@ fn main() -> Result<()> {
     let demo_mode = std::env::var("SCRANNOTATE_DEMO").ok();
     let demo = demo_mode.is_some();
 
-    let img = match &cli.from_file {
-        Some(path) => image::open(path)
-            .with_context(|| format!("opening {}", path.display()))?
-            .to_rgba8(),
-        None if demo => demo_base(),
+    // Where monitors are enumerable, --pick-screen is a listing, not a
+    // chooser: screen numbers are deterministic, so show what they mean.
+    #[cfg(any(target_os = "macos", windows))]
+    if cli.pick_screen && cli.from_file.is_none() && !demo {
+        print!("{}", capture::screen_list()?);
+        return Ok(());
+    }
+
+    let (img, display) = match &cli.from_file {
+        Some(path) => (
+            image::open(path)
+                .with_context(|| format!("opening {}", path.display()))?
+                .to_rgba8(),
+            None,
+        ),
+        None if demo => (demo_base(), None),
         None => {
             if cli.delay > 0 {
                 std::thread::sleep(std::time::Duration::from_secs(cli.delay));
             }
-            capture::capture(&capture::CaptureOptions {
+            let capture::Capture { image, display } = capture::capture(&capture::CaptureOptions {
                 cursor: cli.cursor,
                 pick_screen: cli.pick_screen,
                 screen: cli.screen,
-            })?
+            })?;
+            (image, display)
         }
     };
     let out_dir = cli.save_path.unwrap_or_else(default_output_dir);
@@ -137,15 +166,34 @@ fn main() -> Result<()> {
         // Windowed, deterministic size for docs screenshots; exactly the
         // demo image's size, so the frame fills the canvas edge to edge.
         viewport.with_inner_size([1600.0, 1000.0])
+    } else if cfg!(target_os = "macos") {
+        // Native macOS fullscreen animates onto its own Space — wrong for an
+        // instant screenshot overlay. The window opens undecorated and flips
+        // to winit's "simple fullscreen" on its first frame, on the captured
+        // monitor (app::ScreencapApp::place_window).
+        viewport.with_decorations(false)
     } else {
+        // Fullscreen right away; on Windows the first frame may move it to
+        // the captured monitor (app::ScreencapApp::place_window).
         viewport.with_fullscreen(true)
     };
-    let options = eframe::NativeOptions { viewport, ..Default::default() };
+    #[allow(unused_mut)]
+    let mut options = eframe::NativeOptions { viewport, ..Default::default() };
+    #[cfg(target_os = "macos")]
+    {
+        // Without the default menu bar, Cmd+Q reaches egui's shortcut
+        // handling (which saves prefs on close) instead of terminating the
+        // process behind eframe's back. The editor has no menus anyway.
+        options.event_loop_builder = Some(Box::new(|builder| {
+            use winit::platform::macos::EventLoopBuilderExtMacOS;
+            builder.with_default_menu(false);
+        }));
+    }
     eframe::run_native(
         "scrannotate",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, demo_mode)))
+            Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, demo_mode, display)))
         }),
     )
     .map_err(|err| anyhow!("running ui: {err}"))

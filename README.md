@@ -9,20 +9,24 @@
 **Screen. Annotate. Done.**
 
 scrannotate is a fast, keyboard-friendly screenshot annotation tool for
-Wayland. It grabs one screen per shot as **raw frames over PipeWire** — no
-image encoding, no disk round-trip, so the editor is up in a blink. Select,
-annotate, and ship — copy to the clipboard or save a PNG — without ever
-leaving that one surface. No editor window, no dialogs, no save prompts.
+**Linux (Wayland), macOS, and Windows**. It grabs one screen per shot as a
+**raw frame** — no image encoding, no disk round-trip, so the editor is up
+in a blink. Select, annotate, and ship — copy to the clipboard or save a
+PNG — without ever leaving that one surface. No editor window, no dialogs,
+no save prompts.
 
 ![The editor over a frozen frame: numbered markers, a highlight, an ellipse, a blurred strip, a line, inline text with a penned underline, and an arrow into a selected box showing resize handles and a rotate knob](docs/screenshot-annotate.png)
 
 ## Highlights
 
-- **Screens are numbered slots.** `scrannotate` captures screen 1,
-  `--screen 2` captures screen 2, and so on — the first use of a number
-  shows the desktop's monitor chooser once and remembers your pick (a
-  persisted portal grant per slot), so every run after that is instant and
-  silent. Bind one hotkey per screen. `--pick-screen` re-binds a slot.
+- **Screens are numbers.** `scrannotate` captures screen 1, `--screen 2`
+  captures screen 2, and so on — bind one hotkey per screen. On macOS and
+  Windows the numbers simply follow the display list (`--pick-screen`
+  prints it). On Linux, where Wayland's portal never lets an app pick a
+  monitor itself, the first use of a number shows the desktop's monitor
+  chooser once and remembers your pick (a persisted portal grant per slot),
+  so every run after that is instant and silent; `--pick-screen` re-binds a
+  slot.
 - **One surface, no modes to escape.** The capture fills the screen with
   full-screen crosshairs; drag out the region (its edges extend as guide
   lines while you drag) and the toolbar snaps in beside it. The region stays
@@ -54,15 +58,54 @@ leaving that one surface. No editor window, no dialogs, no save prompts.
 
 ## Install
 
-Linux with Rust 1.88+. Build dependencies:
+### Prebuilt binaries
+
+Every release publishes binaries on the
+[GitHub Releases page](https://github.com/appcove/scrannotate/releases) for:
+
+| Platform | Targets |
+|----------|---------|
+| Linux (glibc 2.39+, e.g. Ubuntu 24.04+) | `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` |
+| macOS | `aarch64-apple-darwin` (Apple silicon), `x86_64-apple-darwin` (Intel) |
+| Windows | `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc` |
+
+Archive names follow cargo-binstall's convention, so
+`cargo binstall scrannotate` also works. Each asset ships a `.sha256`
+checksum.
+
+Platform wrinkles for downloaded binaries:
+
+- **macOS**: the binaries are ad-hoc signed, not notarized (no Apple
+  Developer account). A browser-downloaded archive is quarantined — either
+  approve the app under *System Settings → Privacy & Security → "Open
+  Anyway"* after the first blocked launch, or clear the flag yourself:
+  `xattr -d com.apple.quarantine ./scrannotate`. Downloads via
+  `curl … | tar xz` are never quarantined.
+- **Windows**: the binaries are unsigned, so SmartScreen interjects on
+  first run — *More info → Run anyway*. (Machines with Smart App Control
+  enabled block unsigned binaries outright.)
+
+### Building from source
+
+Rust 1.88+. On Linux the capture backend builds against PipeWire:
 
 ```
-sudo apt install libpipewire-0.3-dev clang pkg-config
+sudo apt install libpipewire-0.3-dev clang pkg-config   # needs PipeWire 1.x, e.g. Ubuntu 24.04+
 ```
 
-(`cargo build --no-default-features` skips the PipeWire capture backend —
-only `--from-file` works then; useful for developing the UI on a machine
-without PipeWire headers.)
+macOS and Windows need no system packages — just a Rust toolchain.
+
+```
+cargo build --release
+```
+
+(`cargo build --no-default-features` skips the capture backend — only
+`--from-file` works then; useful for developing the UI on a machine without
+PipeWire headers.)
+
+## Platform notes
+
+### Linux
 
 Runtime: PipeWire and xdg-desktop-portal (present on any GNOME, KDE, or
 wlroots desktop), plus `wl-clipboard` — copying spawns `wl-copy`, whose
@@ -70,33 +113,48 @@ forked child keeps serving the clipboard after scrannotate quits (a Wayland
 clipboard normally dies with its owner). Without it, copy falls back to an
 in-process clipboard that only survives if a clipboard manager grabs it.
 
-```
-cargo build --release
-install -Dm755 target/release/scrannotate ~/.local/bin/scrannotate
-```
-
 Bind it to your screenshot key (e.g. in GNOME: Settings → Keyboard →
 Custom Shortcuts → `scrannotate` on `Print`).
+
+### macOS
+
+macOS 12.3+ (ScreenCaptureKit). The first capture triggers the **Screen
+Recording** permission prompt. macOS attributes that permission to the app
+that *launched* the process — run scrannotate from Terminal and it is
+Terminal that needs the grant; launch it from a hotkey tool (Raycast,
+Hammerspoon, a Shortcuts binding) and that tool holds the grant, once,
+covering every capture after it. Expect macOS 15+ to re-confirm
+screen-recording apps roughly monthly; every capture tool gets the same
+treatment. Keyboard shortcuts read as `Ctrl` below but are the `⌘` key on
+macOS.
+
+### Windows
+
+Windows 10 1903+ (Windows Graphics Capture, with a DXGI fallback — note the
+fallback cannot embed the `--cursor` pointer). On Windows 10 the system may
+flash its yellow capture border for the instant of the shot; Windows 11
+suppresses it. HDR displays currently capture in SDR (washed-out colors) —
+a known limitation of BGRA8 capture. Bind a hotkey via a shortcut file's
+*Properties → Shortcut key*, PowerToys, or AutoHotkey.
 
 ## Usage
 
 ```
 scrannotate                      # capture screen 1, select a region, annotate in place
-scrannotate --screen 2           # capture screen 2 (first use: pick which monitor "2" means)
-scrannotate --pick-screen        # re-open the monitor chooser to re-bind the slot
+scrannotate --screen 2           # capture screen 2
+scrannotate --pick-screen        # Linux: re-bind what "screen N" means; macOS/Windows: list screens
 scrannotate --cursor             # include the mouse cursor in the capture
 scrannotate --delay 3            # wait 3s before capturing (open that menu first)
 scrannotate --save-path DIR      # where Ctrl+S saves (default ~/Pictures/Screenshots)
 scrannotate --from-file img.png  # annotate an existing image (no capture)
 ```
 
-The first use of each screen slot shows the desktop's screen-share dialog —
-that's where you decide which monitor the number means; the granted portal
-token is saved per slot, so subsequent captures skip it. (Wayland doesn't
-let apps pick a monitor programmatically or ask where the cursor is, so the
-one-time chooser is the deterministic way to bind numbers to screens.) Bind
-hotkeys to taste: `Print` → `scrannotate`, `Shift+Print` →
-`scrannotate --screen 2`.
+On Linux, the first use of each screen slot shows the desktop's
+screen-share dialog — that's where you decide which monitor the number
+means; the granted portal token is saved per slot, so subsequent captures
+skip it. On macOS and Windows there is no dialog: screen numbers follow the
+display list, primary first. Bind hotkeys to taste: `Print` →
+`scrannotate`, `Shift+Print` → `scrannotate --screen 2`.
 
 ### The flow
 
@@ -128,6 +186,8 @@ hotkeys to taste: `Print` → `scrannotate`, `Shift+Print` →
 
 ### Keys
 
+On macOS, `Ctrl` in this table is the `⌘` Command key.
+
 | Tool | Key | | Action | Key |
 |------|-----|-|--------|-----|
 | Select | `S` / tap `Space` | | Copy & close | `Enter` / `Ctrl+C` |
@@ -152,19 +212,31 @@ Click the color swatch in the toolbar's settings section:
 Recently used colors form a most-recently-used stack (clicking one loads it
 into the picker), and colors you actually draw with bubble to its head. The
 recents — plus stroke width and text size once you've deliberately adjusted
-them — persist in `$XDG_STATE_HOME/scrannotate/prefs`; untouched sizes stay
+them — persist between runs in a small state directory:
+`$XDG_STATE_HOME/scrannotate` on Linux (default
+`~/.local/state/scrannotate`), `~/Library/Application Support/scrannotate`
+on macOS, `%LOCALAPPDATA%\scrannotate` on Windows. Untouched sizes stay
 resolution-scaled defaults.
 
 ## How it works
 
-Wayland doesn't let applications read the screen directly, so scrannotate
-asks the **XDG Desktop Portal** for a `ScreenCast` stream
-(`src/capture/screencast.rs`, via [pinray]/PipeWire) and takes a single
-frame — raw RGBA over shared memory, no image encoding or disk round-trip,
-which is why capture is fast. Each screen slot's grant persists via a
-portal restore token, so only a slot's first use shows the chooser. The
-frame is shown frozen in a fullscreen window; everything you do happens on
-that frozen frame.
+Capture runs through [pinray] on every platform — one streaming session,
+one frame taken, no encoding:
+
+- **Linux**: Wayland doesn't let applications read the screen directly, so
+  scrannotate asks the **XDG Desktop Portal** for a `ScreenCast` stream
+  (`src/capture/screencast.rs`, PipeWire) — raw RGBA over shared memory.
+  Each screen slot's grant persists via a portal restore token, so only a
+  slot's first use shows the chooser.
+- **macOS**: **ScreenCaptureKit** (`src/capture/monitor.rs`), picking the
+  display by its ID.
+- **Windows**: **Windows Graphics Capture** with a DXGI desktop-duplication
+  fallback (`src/capture/monitor.rs`).
+
+The frame is shown frozen in a fullscreen window on the monitor it came
+from; everything you do happens on that frozen frame. (On macOS that means
+winit's *simple fullscreen* — instant, in place — rather than the native
+fullscreen that animates onto its own Space.)
 
 Inside the app, the frozen frame lives in a `Document` (annotations with
 stable ids, the region, and transactional undo — `src/document.rs`), and
@@ -178,15 +250,15 @@ into the final PNG.
 
 One workaround worth knowing about: pinray 0.2.4 only *logs* the portal
 restore token instead of returning it, so `src/capture/screencast.rs`
-catches it with a tracing layer. Drop that when pinray exposes the token
-properly.
+catches it with a tracing layer. Drop that when pinray exposes the token.
 
 [pinray]: https://crates.io/crates/pinray
 
 ## Running inside a container (development)
 
-Capture needs the host's **session D-Bus** socket (PipeWire itself arrives
-as a file descriptor over the portal's `OpenPipeWireRemote`):
+On Linux, capture needs the host's **session D-Bus** socket (PipeWire
+itself arrives as a file descriptor over the portal's
+`OpenPipeWireRemote`):
 
 ```
 docker run ... \

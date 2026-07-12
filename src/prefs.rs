@@ -1,9 +1,9 @@
 //! Persisted user preferences: a tiny `key=value` file in the same state
-//! directory as the portal restore token (`$XDG_STATE_HOME/scrannotate/`).
-//! Stores the recently-used color palette, and — only once the user has
-//! deliberately adjusted them — the stroke width and font size. Untouched
-//! sizes stay resolution-scaled defaults and are never written, so a small
-//! capture's defaults can't leak into a 4K session.
+//! directory as the portal restore token ([`state_dir`]). Stores the
+//! recently-used color palette, and — only once the user has deliberately
+//! adjusted them — the stroke width and font size. Untouched sizes stay
+//! resolution-scaled defaults and are never written, so a small capture's
+//! defaults can't leak into a 4K session.
 
 use std::path::PathBuf;
 
@@ -12,11 +12,19 @@ use eframe::egui::Color32;
 use crate::annotate::Style;
 
 /// `$XDG_STATE_HOME/scrannotate` (default `~/.local/state/scrannotate`).
+#[cfg(all(unix, not(target_os = "macos")))]
 pub fn state_dir() -> Option<PathBuf> {
     let root = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::home_dir().map(|h| h.join(".local/state")))?;
     Some(root.join("scrannotate"))
+}
+
+/// `~/Library/Application Support/scrannotate` on macOS,
+/// `%LOCALAPPDATA%\scrannotate` on Windows.
+#[cfg(any(target_os = "macos", windows))]
+pub fn state_dir() -> Option<PathBuf> {
+    Some(dirs::data_local_dir()?.join("scrannotate"))
 }
 
 fn prefs_path() -> Option<PathBuf> {

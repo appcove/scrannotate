@@ -2,21 +2,22 @@
 name = "scrannotate"
 version = "0.2.1"
 edition = "2024"
-description = "Wayland screenshot annotation tool: capture, select, annotate in place, copy or save"
+description = "Screenshot annotation tool: capture a screen, select, annotate in place, copy or save"
 license = "Apache-2.0"
 authors = ["Jason Garber <jgarber@appcove.com>"]
 homepage = "https://github.com/appcove/scrannotate"
 repository = "https://github.com/appcove/scrannotate"
 readme = "README.md"
-keywords = ["screenshot", "annotation", "wayland", "screen-capture"]
+keywords = ["screenshot", "annotation", "screen-capture", "cross-platform", "wayland"]
 categories = ["multimedia::images", "gui"]
 
 [features]
-default = ["screencast"]
-# The pinray/PipeWire capture backend (requires libpipewire-0.3-dev to
-# build). Off, only --from-file works — useful for developing the UI on a
-# machine without PipeWire headers.
-screencast = ["dep:pinray", "dep:tracing", "dep:tracing-subscriber"]
+default = ["capture"]
+# The pinray capture backend. Building it on Linux needs libpipewire-0.3-dev,
+# clang, and pkg-config; macOS and Windows need no system packages. Off, only
+# --from-file works — useful for developing the UI on a machine without
+# PipeWire headers.
+capture = ["dep:pinray", "dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
 ab_glyph = "0.2.32"
@@ -29,8 +30,21 @@ epaint_default_fonts = "0.35.0"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 pinray = { version = "0.2.4", optional = true }
 tiny-skia = "0.12.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Only for catching pinray's portal restore token (capture/screencast.rs).
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true }
+
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+dirs = "6.0.0"
+# The same winit eframe uses — direct access for matching the captured
+# monitor and for macOS "simple fullscreen" (app.rs, main.rs).
+winit = { version = "0.30", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+# AttachConsole, so the windows-subsystem binary still prints in a terminal.
+windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
 
 [profile.dev]
 # The image/pixelate paths are unusably slow at opt-level 0 on 4K+ screenshots.

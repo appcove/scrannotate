@@ -1,38 +1,50 @@
-//! Copy the rendered PNG to the clipboard. A Wayland clipboard dies with
-//! the process that owns it, and the app quits right after copying — so
-//! `wl-copy` (which forks a child that keeps serving the clipboard) is the
-//! primary path, and arboard the fallback for setups without wl-clipboard
-//! (where it only outlives us if a clipboard manager takes the contents).
+//! Copy the rendered PNG to the clipboard.
+//!
+//! On Wayland a clipboard dies with the process that owns it, and the app
+//! quits right after copying — so `wl-copy` (which forks a child that keeps
+//! serving the clipboard) is the primary path there, and arboard the
+//! fallback for setups without wl-clipboard (where it only outlives us if a
+//! clipboard manager takes the contents). On macOS and Windows the OS owns
+//! clipboard contents past process exit, so arboard alone is enough.
 
-use std::borrow::Cow;
-use std::io::Write;
-use std::process::{Command, Stdio};
-
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use image::RgbaImage;
 
+#[cfg(all(unix, not(target_os = "macos")))]
 pub fn copy_image(img: &RgbaImage) -> Result<()> {
     let wl_err = match copy_with_wl_copy(img) {
         Ok(()) => return Ok(()),
         Err(err) => err,
     };
-    copy_with_arboard(img).map_err(|arboard_err| {
-        anyhow!("wl-copy: {wl_err}; arboard: {arboard_err}")
-    })
+    copy_with_arboard(img)
+        .map_err(|arboard_err| anyhow::anyhow!("wl-copy: {wl_err}; arboard: {arboard_err}"))
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub fn copy_image(img: &RgbaImage) -> Result<()> {
+    copy_with_arboard(img)
 }
 
 fn copy_with_arboard(img: &RgbaImage) -> Result<()> {
+    use anyhow::Context;
+
     let mut clipboard = arboard::Clipboard::new().context("opening clipboard")?;
     clipboard
         .set_image(arboard::ImageData {
             width: img.width() as usize,
             height: img.height() as usize,
-            bytes: Cow::Borrowed(img.as_raw()),
+            bytes: std::borrow::Cow::Borrowed(img.as_raw()),
         })
         .context("setting clipboard image")
 }
 
+#[cfg(all(unix, not(target_os = "macos")))]
 fn copy_with_wl_copy(img: &RgbaImage) -> Result<()> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    use anyhow::{Context, anyhow};
+
     let mut png = Vec::new();
     img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
         .context("encoding png")?;

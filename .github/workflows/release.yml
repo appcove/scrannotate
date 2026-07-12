@@ -1,0 +1,92 @@
+# Tag v* -> GitHub Release with prebuilt binaries for six targets.
+#
+# The release is created as a draft, the matrix fills in the assets, and the
+# final job publishes it — so users never see a half-populated release.
+# Archive names (scrannotate-<target>.tar.gz / .zip + .sha256) follow
+# cargo-binstall's default lookup pattern, so `cargo binstall scrannotate`
+# works with no extra metadata.
+#
+# Platform notes:
+# - Linux builds on ubuntu-24.04: the capture backend needs
+#   libpipewire-0.3-dev >= 1.x (22.04's 0.3.48 is too old for the libspa
+#   crate), which makes glibc 2.39 the binary's floor.
+# - macOS binaries are ad-hoc signed (codesign "-"): arm64 requires a
+#   signature, and the linker's own one can be fragile. Without a Developer
+#   ID + notarization, browser-downloaded archives still need the
+#   README-documented Gatekeeper unlock.
+# - windows-11-arm runners are free for public repositories only.
+# - macos-15-intel is the last Intel image GitHub offers (until Aug 2027);
+#   after that, build x86_64-apple-darwin on the arm64 runner via
+#   `rustup target add`.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install PipeWire build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev clang pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: scrannotate
+          target: ${{ matrix.target }}
+          tar: unix
+          zip: windows
+          checksum: sha256
+          locked: true
+          codesign: "-"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    needs: upload-assets
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

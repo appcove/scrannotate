@@ -55,6 +55,12 @@ pub struct ScreencapApp {
     /// Demo scene active (`SCRANNOTATE_DEMO`) — keep the user's prefs out
     /// of it entirely.
     demo: bool,
+    /// Identity of the captured monitor, consumed by the first-frame
+    /// placement hook ([`Self::place_window`]); `None` for --from-file.
+    #[cfg(any(target_os = "macos", windows))]
+    capture_display: Option<crate::capture::DisplayInfo>,
+    #[cfg(any(target_os = "macos", windows))]
+    placed: bool,
 }
 
 impl ScreencapApp {
@@ -63,7 +69,10 @@ impl ScreencapApp {
         out_dir: PathBuf,
         select_full: bool,
         demo_mode: Option<String>,
+        capture_display: Option<crate::capture::DisplayInfo>,
     ) -> Self {
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let _ = capture_display; // placement is the compositor's job there
         let min_dim = img.width().min(img.height());
         // Default sizes scale with the screenshot so strokes stay legible on
         // HiDPI captures; deliberately-set (persisted) sizes win over that.
@@ -96,6 +105,10 @@ impl ScreencapApp {
             shot_path: std::env::var_os("SCRANNOTATE_SHOT").map(PathBuf::from),
             shot_frames: 0,
             demo: demo_mode.is_some(),
+            #[cfg(any(target_os = "macos", windows))]
+            capture_display,
+            #[cfg(any(target_os = "macos", windows))]
+            placed: false,
         };
         if let Some(mode) = demo_mode {
             app.seed_demo(&mode);
@@ -360,6 +373,69 @@ impl ScreencapApp {
         }
     }
 
+    /// First frame only: put the editor window on the captured monitor.
+    ///
+    /// - Windows: `SetMonitor` re-fullscreens onto that exact monitor
+    ///   (winit uses its physical bounds, so mixed-DPI setups stay correct).
+    /// - macOS: position onto the monitor, then winit's "simple fullscreen"
+    ///   — instant and in-place, where native fullscreen would animate onto
+    ///   a new Space. `set_borderless_game` hard-hides the menu bar and
+    ///   Dock instead of auto-revealing them at the screen edges.
+    ///
+    /// Linux never gets here: on Wayland the compositor owns placement and
+    /// `with_fullscreen(true)` at creation is all an app can ask for.
+    #[cfg(any(target_os = "macos", windows))]
+    fn place_window(&mut self, ctx: &Context, frame: &eframe::Frame) {
+        if self.placed {
+            return;
+        }
+        self.placed = true;
+        if self.demo {
+            return; // demo runs windowed for deterministic screenshots
+        }
+        let Some(win) = frame.winit_window() else { return };
+        let target = self.capture_display.take();
+
+        #[cfg(windows)]
+        {
+            let Some(target) = target else { return };
+            let monitors: Vec<winit::monitor::MonitorHandle> = win.available_monitors().collect();
+            let on_target = |monitor: &winit::monitor::MonitorHandle| {
+                monitor.name().as_deref() == Some(target.name.as_str())
+            };
+            if win.current_monitor().as_ref().is_some_and(on_target) {
+                return;
+            }
+            // Prefer the device-name match; sizes disambiguate if winit and
+            // the capture backend ever disagree on names.
+            let index = monitors.iter().position(on_target).or_else(|| {
+                monitors.iter().position(|monitor| {
+                    let size = monitor.size();
+                    size.width == target.width && size.height == target.height
+                })
+            });
+            if let Some(index) = index {
+                ctx.send_viewport_cmd(egui::ViewportCommand::SetMonitor(index));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let _ = ctx;
+            use winit::platform::macos::{MonitorHandleExtMacOS, WindowExtMacOS};
+            if let Some(target) = target
+                && let Ok(display_id) = target.id.parse::<u32>()
+                && let Some(monitor) =
+                    win.available_monitors().find(|m| m.native_id() == display_id)
+            {
+                win.set_outer_position(monitor.position());
+            }
+            win.set_borderless_game(true);
+            win.set_simple_fullscreen(true);
+        }
+    }
+
     /// Docs/dev hook: request a window screenshot once the UI settles,
     /// save it, quit.
     fn poll_shot_hook(&mut self, ctx: &Context) {
@@ -418,6 +494,8 @@ impl eframe::App for ScreencapApp {
     fn ui(&mut self, root: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = root.ctx().clone();
         let ctx = &ctx;
+        #[cfg(any(target_os = "macos", windows))]
+        self.place_window(ctx, _frame);
         self.sync_texture(ctx);
         self.poll_shot_hook(ctx);
 

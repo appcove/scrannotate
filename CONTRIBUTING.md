@@ -28,11 +28,14 @@ Submitting a pull request constitutes acceptance of these terms.
 
 ## Development setup
 
-Linux with Rust 1.88+ and:
+Rust 1.88+ on Linux, macOS, or Windows. On Linux the capture backend
+builds against PipeWire (1.x — e.g. Ubuntu 24.04+):
 
 ```
 sudo apt install libpipewire-0.3-dev clang pkg-config
 ```
+
+macOS and Windows need no system packages.
 
 Build and test:
 
@@ -42,10 +45,11 @@ cargo test
 cargo clippy --all-targets
 ```
 
-PipeWire is only required by the `screencast` cargo feature (on by
-default — it is the capture backend). On a machine without
-`libpipewire-0.3-dev`, develop against the capture-less build (only
-`--from-file` and the demo mode work):
+PipeWire is only required on Linux, and only by the `capture` cargo
+feature (on by default — it carries the capture backend on every
+platform). On a Linux machine without `libpipewire-0.3-dev`, develop
+against the capture-less build (only `--from-file` and the demo mode
+work):
 
 ```
 cargo build --no-default-features
@@ -54,7 +58,11 @@ cargo clippy --all-targets --no-default-features
 ```
 
 Please keep `cargo clippy --all-targets` warning-free and `cargo test`
-green; match the style of the surrounding code.
+green on every platform; match the style of the surrounding code. CI
+(`.github/workflows/ci.yml`) runs clippy, build, and tests on Linux
+(x86_64 + arm64), macOS, and Windows (x86_64 + arm64) for every PR.
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is
+pushed.
 
 ## Testing UI changes
 
