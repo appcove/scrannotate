@@ -38,8 +38,12 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) {
             // Plain Enter commits — consumed *before* the TextEdit runs, or
             // the widget first inserts a newline at the cursor and that
             // newline lands in the committed text (trim_end only strips
-            // trailing ones). Shift+Enter passes through as a line break.
-            if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter)) {
+            // trailing ones). Shift+Enter must fall through to the TextEdit
+            // as a line break — but consume_key matches modifiers logically,
+            // so a bare Modifiers::NONE pattern swallows Shift+Enter too
+            // (extra Shift is ignored). Guard on shift so only unmodified
+            // Enter commits.
+            if ui.input_mut(|i| !i.modifiers.shift && i.consume_key(Modifiers::NONE, Key::Enter)) {
                 commit = true;
             }
             let response = ui.add(
