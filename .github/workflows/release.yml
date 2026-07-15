@@ -1,7 +1,13 @@
-# Tag v* -> GitHub Release with prebuilt binaries for six targets.
+# A version bump merged to main -> tag + GitHub Release with prebuilt binaries
+# for six targets. The preparation job is deliberately in this workflow: tags
+# created with GITHUB_TOKEN do not trigger a second workflow, so a separate
+# tag-only build workflow would never run for an automatic release.
 #
-# The release is created as a draft, the matrix fills in the assets, and the
-# final job publishes it — so users never see a half-populated release.
+# The Cargo.toml package version is the source of truth. If its v<version> release
+# already exists, the workflow is a no-op. Otherwise it creates a draft release
+# (and tag), the matrix fills in the assets, and the final job publishes it — so
+# users never see a half-populated release. Existing drafts are resumed on a
+# rerun, making a failed matrix build recoverable.
 # Archive names (scrannotate-<target>.tar.gz / .zip + .sha256) follow
 # cargo-binstall's default lookup pattern, so `cargo binstall scrannotate`
 # works with no extra metadata.
@@ -23,7 +29,15 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths:
+      - Cargo.toml
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions: {}
 
@@ -31,19 +45,53 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
+  prepare-release:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      build: ${{ steps.release.outputs.build }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          draft: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Create or resume the draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(cargo metadata --format-version 1 --no-deps --locked | jq -r '.packages[] | select(.name == "scrannotate") | .version')"
+          if [[ -z "$version" || "$version" == "null" ]]; then
+            echo "Could not read the scrannotate package version" >&2
+            exit 1
+          fi
+
+          tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          release="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft 2>/dev/null || true)"
+          if [[ -n "$release" ]]; then
+            if [[ "$(jq -r '.isDraft' <<< "$release")" == "true" ]]; then
+              echo "Resuming existing draft release $tag"
+              echo "build=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Release $tag is already published; nothing to do"
+              echo "build=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --generate-notes \
+            --target "$GITHUB_SHA" \
+            --title "scrannotate $version"
+          echo "build=true" >> "$GITHUB_OUTPUT"
 
   upload-assets:
-    needs: create-release
+    needs: prepare-release
+    if: needs.prepare-release.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +103,7 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-15-intel
           - target: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-15
           - target: x86_64-pc-windows-msvc
             os: windows-latest
           - target: aarch64-pc-windows-msvc
@@ -73,6 +121,7 @@ jobs:
         with:
           bin: scrannotate
           target: ${{ matrix.target }}
+          ref: refs/tags/${{ needs.prepare-release.outputs.tag }}
           tar: unix
           zip: windows
           checksum: sha256
@@ -81,7 +130,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
-    needs: upload-assets
+    needs: [prepare-release, upload-assets]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -89,4 +138,4 @@ jobs:
       - name: Publish the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+        run: gh release edit "${{ needs.prepare-release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false
