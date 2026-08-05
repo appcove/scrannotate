@@ -72,16 +72,17 @@ Every release publishes binaries on the
 
 Archive names follow cargo-binstall's convention, so
 `cargo binstall scrannotate` also works. Each asset ships a `.sha256`
-checksum.
+checksum. macOS releases additionally include a `*.app.zip`; use that for
+normal Finder/hotkey launching and use the raw archive only for CLI installs.
 
 Platform wrinkles for downloaded binaries:
 
-- **macOS**: the binaries are ad-hoc signed, not notarized (no Apple
-  Developer account). A browser-downloaded archive is quarantined — either
-  approve the app under *System Settings → Privacy & Security → "Open
-  Anyway"* after the first blocked launch, or clear the flag yourself:
-  `xattr -d com.apple.quarantine ./scrannotate`. Downloads via
-  `curl … | tar xz` are never quarantined.
+- **macOS**: the app is ad-hoc signed, not notarized (no Apple Developer
+  account). Unzip the `*.app.zip`, move `scrannotate.app` to Applications,
+  then Control-click it and choose *Open* the first time. If macOS still
+  blocks it, approve it under *System Settings → Privacy & Security → "Open
+  Anyway"*. The app bundle gives screen-recording permission to scrannotate
+  itself instead of Terminal.
 - **Windows**: the binaries are unsigned, so SmartScreen interjects on
   first run — *More info → Run anyway*. (Machines with Smart App Control
   enabled block unsigned binaries outright.)
@@ -104,6 +105,16 @@ cargo build --release
 `--from-file` works then; useful for developing the UI on a machine without
 PipeWire headers.)
 
+### Testing a pull request
+
+Every pull request runs clippy, a release build, and tests on Linux, macOS,
+and Windows. Successful runs keep downloadable builds for 14 days: open the
+PR's **Checks**, select the **CI** run, and download the artifact for the
+machine you want from the run's **Artifacts** section. macOS gets a zipped
+`.app`; Linux and Windows get the bare executable. These are test
+artifacts, not public GitHub Releases — a Release is created only when a
+version-bump PR is merged to `main`.
+
 ## Platform notes
 
 ### Linux
@@ -119,15 +130,14 @@ Custom Shortcuts → `scrannotate` on `Print`).
 
 ### macOS
 
-macOS 12.3+ (ScreenCaptureKit). The first capture triggers the **Screen
-Recording** permission prompt. macOS attributes that permission to the app
-that *launched* the process — run scrannotate from Terminal and it is
-Terminal that needs the grant; launch it from a hotkey tool (Raycast,
-Hammerspoon, a Shortcuts binding) and that tool holds the grant, once,
-covering every capture after it. Expect macOS 15+ to re-confirm
-screen-recording apps roughly monthly; every capture tool gets the same
-treatment. Keyboard shortcuts read as `Ctrl` below but are the `⌘` key on
-macOS.
+macOS 12.3+ (ScreenCaptureKit). Launch the release's `scrannotate.app` so
+macOS records the **Screen Recording** permission against scrannotate's
+stable bundle identity. Running the raw executable from Terminal instead
+attributes the launch and permission flow to Terminal. For command-line
+arguments, use `open -a scrannotate --args --screen 2`; hotkey tools can
+launch the app the same way. Expect macOS 15+ to re-confirm screen-recording
+apps roughly monthly; every capture tool gets the same treatment. Keyboard
+shortcuts read as `Ctrl` below but are the `⌘` key on macOS.
 
 ### Windows
 
