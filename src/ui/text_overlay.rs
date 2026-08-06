@@ -2,6 +2,8 @@
 //! with the same font/color the committed annotation will have. Never
 //! soft-wraps — lines break only at typed newlines.
 
+use eframe::egui::text_selection::CCursorRange;
+use eframe::egui::widgets::text_edit::TextEditState;
 use eframe::egui::{
     self, Color32, Context, FontId, Id, Key, Margin, Modifiers, Rect, TextEdit, Ui,
 };
@@ -9,11 +11,37 @@ use eframe::egui::{
 use crate::editor::Editor;
 use crate::editor::state::EditorState;
 
-pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) {
+/// Explicit id for the inline TextEdit, so its cursor can be read back out
+/// of egui memory *before* the widget runs this frame.
+const INPUT_ID: &str = "text-editor-input";
+
+/// Something the text editor deliberately declined to handle.
+pub enum TextEditAction {
+    /// Ctrl+C that the editor has no use for: run the app's copy-and-close,
+    /// exactly as if no text edit were open.
+    CopyAndClose,
+}
+
+pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEditAction> {
     let view = editor.view;
     let mut commit = false;
     let mut cancel = false;
-    let EditorState::TextEditing(edit) = &mut editor.state else { return };
+    let EditorState::TextEditing(edit) = &mut editor.state else { return None };
+
+    // Ctrl+C reaches us as a synthetic Copy event (see handle_shortcuts).
+    // egui's TextEdit silently drops it when there is nothing selected, so
+    // that dead case becomes the app's copy-and-close instead. Decided
+    // before the widget is added: afterwards the cursor has already moved
+    // and the event is spent. Nothing consumes the event here because the
+    // early return skips the TextEdit entirely, and events do not survive
+    // the frame.
+    let caret = TextEditState::load(ctx, Id::new(INPUT_ID)).and_then(|s| s.cursor.char_range());
+    if copy_falls_through(&edit.buffer, caret)
+        && ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)))
+    {
+        return Some(TextEditAction::CopyAndClose);
+    }
+
     let screen_pos = view.to_screen(canvas, edit.pos);
     let font = FontId::proportional((edit.style.font_size * view.zoom).max(9.0));
     // Size the editor to its content so clicks next to the text still reach
@@ -48,6 +76,7 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) {
             }
             let response = ui.add(
                 TextEdit::multiline(&mut edit.buffer)
+                    .id(Id::new(INPUT_ID))
                     .font(font)
                     .text_color(edit.style.color)
                     .frame(egui::Frame::NONE)
@@ -68,5 +97,53 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) {
         editor.cancel_text();
     } else if commit {
         editor.commit_text();
+    }
+    None
+}
+
+/// Does Ctrl+C belong to the app rather than to the text editor? Only when
+/// the editor would do nothing with it: nothing selected, caret at the end.
+/// Anywhere else it stays a text operation — mid-buffer it is the caret the
+/// user would grow a selection from, so stealing it would surprise.
+///
+/// A just-opened editor has no stored cursor yet; its buffer is empty, so
+/// the caret is trivially at the end.
+fn copy_falls_through(buffer: &str, caret: Option<CCursorRange>) -> bool {
+    caret.is_none_or(|r| r.is_empty() && usize::from(r.primary.index) >= buffer.chars().count())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::text::CCursor;
+
+    fn caret_at(index: usize) -> Option<CCursorRange> {
+        Some(CCursorRange::one(CCursor::new(index)))
+    }
+
+    #[test]
+    fn copy_falls_through_only_at_the_end_without_a_selection() {
+        assert!(copy_falls_through("hello", caret_at(5)));
+        assert!(copy_falls_through("", caret_at(0)));
+        // Mid-buffer: the editor's own caret, leave it alone.
+        assert!(!copy_falls_through("hello", caret_at(4)));
+        assert!(!copy_falls_through("hello", caret_at(0)));
+        // A selection is always the editor's, even one ending at the end.
+        assert!(!copy_falls_through(
+            "hello",
+            Some(CCursorRange::two(CCursor::new(0), CCursor::new(5)))
+        ));
+    }
+
+    #[test]
+    fn a_fresh_editor_has_no_cursor_yet() {
+        assert!(copy_falls_through("", None));
+    }
+
+    #[test]
+    fn the_end_is_counted_in_chars_not_bytes() {
+        // 5 chars, 10 bytes: a byte-indexed comparison would never match.
+        assert!(copy_falls_through("héllö", caret_at(5)));
+        assert!(!copy_falls_through("héllö", caret_at(4)));
     }
 }

@@ -72,16 +72,17 @@ Every release publishes binaries on the
 
 Archive names follow cargo-binstall's convention, so
 `cargo binstall scrannotate` also works. Each asset ships a `.sha256`
-checksum.
+checksum. macOS releases additionally include a `*.app.zip`; use that for
+normal Finder/hotkey launching and use the raw archive only for CLI installs.
 
 Platform wrinkles for downloaded binaries:
 
-- **macOS**: the binaries are ad-hoc signed, not notarized (no Apple
-  Developer account). A browser-downloaded archive is quarantined — either
-  approve the app under *System Settings → Privacy & Security → "Open
-  Anyway"* after the first blocked launch, or clear the flag yourself:
-  `xattr -d com.apple.quarantine ./scrannotate`. Downloads via
-  `curl … | tar xz` are never quarantined.
+- **macOS**: the app is ad-hoc signed, not notarized (no Apple Developer
+  account). Unzip the `*.app.zip`, move `scrannotate.app` to Applications,
+  then Control-click it and choose *Open* the first time. If macOS still
+  blocks it, approve it under *System Settings → Privacy & Security → "Open
+  Anyway"*. The app bundle gives screen-recording permission to scrannotate
+  itself instead of Terminal.
 - **Windows**: the binaries are unsigned, so SmartScreen interjects on
   first run — *More info → Run anyway*. (Machines with Smart App Control
   enabled block unsigned binaries outright.)
@@ -104,6 +105,16 @@ cargo build --release
 `--from-file` works then; useful for developing the UI on a machine without
 PipeWire headers.)
 
+### Testing a pull request
+
+Every pull request runs clippy, a release build, and tests on Linux, macOS,
+and Windows. Successful runs keep downloadable builds for 14 days: open the
+PR's **Checks**, select the **CI** run, and download the artifact for the
+machine you want from the run's **Artifacts** section. macOS gets a zipped
+`.app`; Linux and Windows get the bare executable. These are test
+artifacts, not public GitHub Releases — a Release is created only when a
+version-bump PR is merged to `main`.
+
 ## Platform notes
 
 ### Linux
@@ -119,15 +130,14 @@ Custom Shortcuts → `scrannotate` on `Print`).
 
 ### macOS
 
-macOS 12.3+ (ScreenCaptureKit). The first capture triggers the **Screen
-Recording** permission prompt. macOS attributes that permission to the app
-that *launched* the process — run scrannotate from Terminal and it is
-Terminal that needs the grant; launch it from a hotkey tool (Raycast,
-Hammerspoon, a Shortcuts binding) and that tool holds the grant, once,
-covering every capture after it. Expect macOS 15+ to re-confirm
-screen-recording apps roughly monthly; every capture tool gets the same
-treatment. Keyboard shortcuts read as `Ctrl` below but are the `⌘` key on
-macOS.
+macOS 12.3+ (ScreenCaptureKit). Launch the release's `scrannotate.app` so
+macOS records the **Screen Recording** permission against scrannotate's
+stable bundle identity. Running the raw executable from Terminal instead
+attributes the launch and permission flow to Terminal. For command-line
+arguments, use `open -a scrannotate --args --screen 2`; hotkey tools can
+launch the app the same way. Expect macOS 15+ to re-confirm screen-recording
+apps roughly monthly; every capture tool gets the same treatment. Keyboard
+shortcuts read as `Ctrl` below but are the `⌘` key on macOS.
 
 ### Windows
 
@@ -167,9 +177,10 @@ display list, primary first. Bind hotkeys to taste: `Print` →
 2. **Annotate** — the toolbar (draggable by its `• • •` grip) has the tools
    two per row, Arrow/Text/Marker/Line first. Pick one and draw. Markers
    drop with a click, or drag one to pull an arrow out of it. Text is typed
-   inline; Shift+Enter for new lines.
+   inline; Shift+Enter for new lines. Right-click anywhere to keep what you
+   just did and go back to the Select tool.
 
-   ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line explaining Enter, Shift+Enter, and Esc](docs/screenshot-text.png)
+   ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line spelling out what the keys do while typing](docs/screenshot-text.png)
 
 3. **Refine** — tap `Space` (or `S`) for the Select tool: hover highlights
    what's clickable; click an item to select it, drag an item to move it,
@@ -184,7 +195,9 @@ display list, primary first. Bind hotkeys to taste: `Print` →
 
 4. **Ship** — `Enter`/`Ctrl+C` copies the region and closes; `Ctrl+S` saves
    a PNG and closes; the toolbar also has plain Copy/Save buttons that keep
-   the editor open. `Esc Esc` discards everything, no questions asked.
+   the editor open. `Ctrl+C` ships mid-typing too, as long as nothing is
+   selected and the caret is at the end — anywhere else it stays an ordinary
+   text copy. `Esc Esc` discards everything, no questions asked.
 
 ### Keys
 
@@ -192,7 +205,7 @@ On macOS, `Ctrl` in this table is the `⌘` Command key.
 
 | Tool | Key | | Action | Key |
 |------|-----|-|--------|-----|
-| Select | `S` / tap `Space` | | Copy & close | `Enter` / `Ctrl+C` |
+| Select | `S` / tap `Space` / right-click | | Copy & close | `Enter` / `Ctrl+C` |
 | Pen | `P` | | Save & close | `Ctrl+S` |
 | Line | `L` | | Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Arrow | `A` | | Delete selection | `Del` / `Backspace` |

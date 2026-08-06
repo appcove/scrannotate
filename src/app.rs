@@ -61,6 +61,11 @@ pub struct ScreencapApp {
     capture_display: Option<crate::capture::DisplayInfo>,
     #[cfg(any(target_os = "macos", windows))]
     placed: bool,
+    /// macOS enters simple fullscreen after the first frame. Refit for a
+    /// couple of frames while that asynchronous resize settles; otherwise
+    /// the capture stays fitted to the small startup window.
+    #[cfg(target_os = "macos")]
+    placement_refit_frames: u8,
 }
 
 impl ScreencapApp {
@@ -109,6 +114,8 @@ impl ScreencapApp {
             capture_display,
             #[cfg(any(target_os = "macos", windows))]
             placed: false,
+            #[cfg(target_os = "macos")]
+            placement_refit_frames: 0,
         };
         if let Some(mode) = demo_mode {
             app.seed_demo(&mode);
@@ -422,7 +429,6 @@ impl ScreencapApp {
 
         #[cfg(target_os = "macos")]
         {
-            let _ = ctx;
             use winit::platform::macos::{MonitorHandleExtMacOS, WindowExtMacOS};
             if let Some(target) = target
                 && let Ok(display_id) = target.id.parse::<u32>()
@@ -433,6 +439,8 @@ impl ScreencapApp {
             }
             win.set_borderless_game(true);
             win.set_simple_fullscreen(true);
+            self.placement_refit_frames = 2;
+            ctx.request_repaint();
         }
     }
 
@@ -542,8 +550,25 @@ impl eframe::App for ScreencapApp {
                     }
                     None => {}
                 }
-                text_overlay::show(ctx, &mut self.editor, canvas);
+                // Ctrl+C with nothing selected and the caret at the end is
+                // not a text operation — it means the same thing it does
+                // outside the editor, with the text on screen included.
+                if let Some(text_overlay::TextEditAction::CopyAndClose) =
+                    text_overlay::show(ctx, &mut self.editor, canvas)
+                {
+                    self.editor.commit_text();
+                    self.copy(ctx, true);
+                }
             },
         );
+
+        // set_simple_fullscreen takes effect after the first layout. Make
+        // the next layouts fit the capture to the resized fullscreen canvas.
+        #[cfg(target_os = "macos")]
+        if self.placement_refit_frames > 0 {
+            self.placement_refit_frames -= 1;
+            self.editor.view.fitted = false;
+            ctx.request_repaint();
+        }
     }
 }

@@ -10,7 +10,9 @@
 # rerun, making a failed matrix build recoverable.
 # Archive names (scrannotate-<target>.tar.gz / .zip + .sha256) follow
 # cargo-binstall's default lookup pattern, so `cargo binstall scrannotate`
-# works with no extra metadata.
+# works with no extra metadata. macOS targets also publish
+# scrannotate-<target>.app.zip — the bundle users double-click; the tarball
+# stays for binstall and CLI installs.
 #
 # Platform notes:
 # - Linux builds on ubuntu-24.04: the capture backend needs
@@ -52,6 +54,7 @@ jobs:
     outputs:
       build: ${{ steps.release.outputs.build }}
       tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -68,6 +71,7 @@ jobs:
 
           tag="v$version"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
           release="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft 2>/dev/null || true)"
           if [[ -n "$release" ]]; then
@@ -117,6 +121,16 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev clang pkg-config
       - uses: dtolnay/rust-toolchain@stable
+      - name: Build and package macOS app
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release --locked --target "${{ matrix.target }}"
+          archive="scrannotate-${{ matrix.target }}.app.zip"
+          packaging/macos/bundle.sh \
+            "target/${{ matrix.target }}/release/scrannotate" \
+            "${{ needs.prepare-release.outputs.version }}" \
+            "dist/$archive"
+          (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: scrannotate
@@ -128,6 +142,15 @@ jobs:
           locked: true
           codesign: "-"
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload macOS app
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.prepare-release.outputs.tag }}" \
+            dist/*.app.zip dist/*.app.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
   publish-release:
     needs: [prepare-release, upload-assets]
