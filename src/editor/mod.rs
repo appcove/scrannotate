@@ -120,7 +120,7 @@ impl Editor {
                 (StatusKind::Alert, "Press Esc again to close and discard".to_owned())
             }
             EditorState::TextEditing(_) => {
-                hint("Type · Enter: done · Shift+Enter: new line · Esc: cancel")
+                hint("Type · Enter: done · Shift+Enter: new line · Ctrl+C: copy & close · Esc: cancel")
             }
             EditorState::DrawingShape { .. } => hint("Release to place · Esc: cancel"),
             EditorState::RegionDraw { .. } => hint("Release to set the region · Esc: cancel"),
@@ -1390,6 +1390,26 @@ mod tests {
         ed.text_tool_click(Pos2::new(600.0, 400.0), &measure);
         let EditorState::TextEditing(edit) = &ed.state else { panic!("editing again") };
         assert_eq!(edit.style, defaults);
+    }
+
+    /// What a right click on the canvas does: keep the typing, drop the
+    /// tool. (Esc is the discarding way out.)
+    #[test]
+    fn returning_to_select_keeps_the_text_being_typed() {
+        let mut ed = editor();
+        ed.set_tool(Tool::Text);
+        ed.text_tool_click(Pos2::new(50.0, 50.0), &measure);
+        let EditorState::TextEditing(edit) = &mut ed.state else { panic!("editing") };
+        edit.buffer = "kept".into();
+        ed.set_tool(Tool::Select);
+        assert_eq!(ed.tool, Tool::Select);
+        assert!(ed.state.is_idle());
+        assert!(
+            ed.doc
+                .annotations()
+                .iter()
+                .any(|(_, a)| matches!(&a.shape, Shape::Text { text, .. } if text == "kept"))
+        );
     }
 
     #[test]

@@ -177,9 +177,10 @@ display list, primary first. Bind hotkeys to taste: `Print` →
 2. **Annotate** — the toolbar (draggable by its `• • •` grip) has the tools
    two per row, Arrow/Text/Marker/Line first. Pick one and draw. Markers
    drop with a click, or drag one to pull an arrow out of it. Text is typed
-   inline; Shift+Enter for new lines.
+   inline; Shift+Enter for new lines. Right-click anywhere to keep what you
+   just did and go back to the Select tool.
 
-   ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line explaining Enter, Shift+Enter, and Esc](docs/screenshot-text.png)
+   ![Inline text editing: the string is typed directly on the image in its final font and color, with the status line spelling out what the keys do while typing](docs/screenshot-text.png)
 
 3. **Refine** — tap `Space` (or `S`) for the Select tool: hover highlights
    what's clickable; click an item to select it, drag an item to move it,
@@ -194,7 +195,9 @@ display list, primary first. Bind hotkeys to taste: `Print` →
 
 4. **Ship** — `Enter`/`Ctrl+C` copies the region and closes; `Ctrl+S` saves
    a PNG and closes; the toolbar also has plain Copy/Save buttons that keep
-   the editor open. `Esc Esc` discards everything, no questions asked.
+   the editor open. `Ctrl+C` ships mid-typing too, as long as nothing is
+   selected and the caret is at the end — anywhere else it stays an ordinary
+   text copy. `Esc Esc` discards everything, no questions asked.
 
 ### Keys
 
@@ -202,7 +205,7 @@ On macOS, `Ctrl` in this table is the `⌘` Command key.
 
 | Tool | Key | | Action | Key |
 |------|-----|-|--------|-----|
-| Select | `S` / tap `Space` | | Copy & close | `Enter` / `Ctrl+C` |
+| Select | `S` / tap `Space` / right-click | | Copy & close | `Enter` / `Ctrl+C` |
 | Pen | `P` | | Save & close | `Ctrl+S` |
 | Line | `L` | | Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Arrow | `A` | | Delete selection | `Del` / `Backspace` |

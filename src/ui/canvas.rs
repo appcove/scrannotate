@@ -115,6 +115,13 @@ pub fn show(ui: &mut Ui, editor: &mut Editor, texture: Option<&TextureHandle>) -
         editor.click(p, pos, canvas, mods, &measure);
     }
 
+    // Right *click* parks you back on Select, keeping whatever was in
+    // flight (set_tool commits an open text edit and ignores mid-drag
+    // calls). Right *drag* still rubber-bands a new region.
+    if response.clicked_by(PointerButton::Secondary) {
+        editor.set_tool(Tool::Select);
+    }
+
     if response.double_clicked_by(PointerButton::Primary)
         && let Some(pos) = response.interact_pointer_pos()
     {

@@ -550,7 +550,15 @@ impl eframe::App for ScreencapApp {
                     }
                     None => {}
                 }
-                text_overlay::show(ctx, &mut self.editor, canvas);
+                // Ctrl+C with nothing selected and the caret at the end is
+                // not a text operation — it means the same thing it does
+                // outside the editor, with the text on screen included.
+                if let Some(text_overlay::TextEditAction::CopyAndClose) =
+                    text_overlay::show(ctx, &mut self.editor, canvas)
+                {
+                    self.editor.commit_text();
+                    self.copy(ctx, true);
+                }
             },
         );
 
