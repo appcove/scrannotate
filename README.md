@@ -9,7 +9,7 @@
 **Screen. Annotate. Done.**
 
 scrannotate is a fast, keyboard-friendly screenshot annotation tool for
-**Linux (Wayland), macOS, and Windows**. It grabs one screen per shot as a
+**Linux (Wayland and X11), macOS, and Windows**. It grabs one screen per shot as a
 **raw frame** — no image encoding, no disk round-trip, so the editor is up
 in a blink. Select, annotate, and ship — copy to the clipboard or save a
 PNG — without ever leaving that one surface. No editor window, no dialogs,
@@ -20,13 +20,13 @@ no save prompts.
 ## Highlights
 
 - **Screens are numbers.** `scrannotate` captures screen 1, `--screen 2`
-  captures screen 2, and so on — bind one hotkey per screen. On macOS and
-  Windows the numbers simply follow the display list (`--pick-screen`
-  prints it). On Linux, where Wayland's portal never lets an app pick a
-  monitor itself, the first use of a number shows the desktop's monitor
-  chooser once and remembers your pick (a persisted portal grant per slot),
-  so every run after that is instant and silent; `--pick-screen` re-binds a
-  slot.
+  captures screen 2, and so on — bind one hotkey per screen. On macOS,
+  Windows, and Linux/X11 the numbers simply follow the display list
+  (`--pick-screen` prints it). On Linux under Wayland, where the portal
+  never lets an app pick a monitor itself, the first use of a number shows
+  the desktop's monitor chooser once and remembers your pick (a persisted
+  portal grant per slot), so every run after that is instant and silent;
+  `--pick-screen` re-binds a slot.
 - **One surface, no modes to escape.** The capture fills the screen with
   full-screen crosshairs; drag out the region (its edges extend as guide
   lines while you drag) and the toolbar snaps in beside it. The region stays
@@ -119,11 +119,19 @@ version-bump PR is merged to `main`.
 
 ### Linux
 
-Runtime: PipeWire and xdg-desktop-portal (present on any GNOME, KDE, or
-wlroots desktop), plus `wl-clipboard` — copying spawns `wl-copy`, whose
-forked child keeps serving the clipboard after scrannotate quits (a Wayland
-clipboard normally dies with its owner). Without it, copy falls back to an
-in-process clipboard that only survives if a clipboard manager grabs it.
+**Wayland** runtime: PipeWire and xdg-desktop-portal (present on any GNOME,
+KDE, or wlroots desktop), plus `wl-clipboard` — copying spawns `wl-copy`,
+whose forked child keeps serving the clipboard after scrannotate quits (a
+Wayland clipboard normally dies with its owner). Without it, copy falls
+back to an in-process clipboard that only survives if a clipboard manager
+grabs it.
+
+**X11** sessions skip the portal and PipeWire entirely: displays are
+enumerated directly, so `--screen N` is simply the Nth display (primary
+first) and `--pick-screen` lists them — no chooser dialog, no persisted
+grant. Install `xclip` for copies that outlive the process (the X11
+clipboard dies with its owner too); without it the same in-process
+fallback and clipboard-manager caveat apply.
 
 Bind it to your screenshot key (e.g. in GNOME: Settings → Keyboard →
 Custom Shortcuts → `scrannotate` on `Print`).
@@ -153,19 +161,19 @@ a known limitation of BGRA8 capture. Bind a hotkey via a shortcut file's
 ```
 scrannotate                      # capture screen 1, select a region, annotate in place
 scrannotate --screen 2           # capture screen 2
-scrannotate --pick-screen        # Linux: re-bind what "screen N" means; macOS/Windows: list screens
+scrannotate --pick-screen        # Wayland: re-bind what "screen N" means; X11/macOS/Windows: list screens
 scrannotate --cursor             # include the mouse cursor in the capture
 scrannotate --delay 3            # wait 3s before capturing (open that menu first)
 scrannotate --save-path DIR      # where Ctrl+S saves (default ~/Pictures/Screenshots)
 scrannotate --from-file img.png  # annotate an existing image (no capture)
 ```
 
-On Linux, the first use of each screen slot shows the desktop's
-screen-share dialog — that's where you decide which monitor the number
-means; the granted portal token is saved per slot, so subsequent captures
-skip it. On macOS and Windows there is no dialog: screen numbers follow the
-display list, primary first. Bind hotkeys to taste: `Print` →
-`scrannotate`, `Shift+Print` → `scrannotate --screen 2`.
+On Linux under Wayland, the first use of each screen slot shows the
+desktop's screen-share dialog — that's where you decide which monitor the
+number means; the granted portal token is saved per slot, so subsequent
+captures skip it. On X11, macOS, and Windows there is no dialog: screen
+numbers follow the display list, primary first. Bind hotkeys to taste:
+`Print` → `scrannotate`, `Shift+Print` → `scrannotate --screen 2`.
 
 ### The flow
 
@@ -239,11 +247,14 @@ resolution-scaled defaults.
 Capture runs through [pinray] on every platform — one streaming session,
 one frame taken, no encoding:
 
-- **Linux**: Wayland doesn't let applications read the screen directly, so
-  scrannotate asks the **XDG Desktop Portal** for a `ScreenCast` stream
-  (`src/capture/screencast.rs`, PipeWire) — raw RGBA over shared memory.
-  Each screen slot's grant persists via a portal restore token, so only a
-  slot's first use shows the chooser.
+- **Linux/Wayland**: Wayland doesn't let applications read the screen
+  directly, so scrannotate asks the **XDG Desktop Portal** for a
+  `ScreenCast` stream (`src/capture/screencast.rs`, PipeWire) — raw RGBA
+  over shared memory. Each screen slot's grant persists via a portal
+  restore token, so only a slot's first use shows the chooser.
+- **Linux/X11**: no portal — pinray reads frames straight from the X server
+  and RandR enumerates the monitors, so screens are picked by number
+  (`src/capture/monitor.rs`, shared with macOS and Windows).
 - **macOS**: **ScreenCaptureKit** (`src/capture/monitor.rs`), picking the
   display by its ID.
 - **Windows**: **Windows Graphics Capture** with a DXGI desktop-duplication

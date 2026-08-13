@@ -26,7 +26,11 @@ pub fn show(ui: &mut Ui, editor: &mut Editor, texture: Option<&TextureHandle>) -
         })
     };
 
-    if !editor.view.fitted {
+    // Also refits when the canvas changes size under an untouched view:
+    // fullscreen arrives asynchronously on X11 (the WM resizes the window
+    // frames after the first paint), so the initial fit can be to the small
+    // pre-fullscreen window and would otherwise stick.
+    if editor.view.needs_fit(canvas.size()) {
         editor.view.fit(editor.doc.image_size(), canvas.size());
     }
 
@@ -50,7 +54,7 @@ pub fn show(ui: &mut Ui, editor: &mut Editor, texture: Option<&TextureHandle>) -
     // checks that the button is down, so gate it off while a primary-button
     // interaction runs (holding middle mid-drag must not pan under it)...
     if response.dragged_by(PointerButton::Middle) && !editor.state.is_pointer_op() {
-        editor.view.pan += response.drag_delta();
+        editor.view.pan_by(response.drag_delta());
     }
     // ...or with space+drag, which does occupy the state machine.
     let space_down = !editor.state.is_text_editing() && ctx.input(|i| i.key_down(Key::Space));
@@ -63,7 +67,7 @@ pub fn show(ui: &mut Ui, editor: &mut Editor, texture: Option<&TextureHandle>) -
     if matches!(editor.state, EditorState::Panning)
         && response.dragged_by(PointerButton::Primary)
     {
-        editor.view.pan += response.drag_delta();
+        editor.view.pan_by(response.drag_delta());
     }
 
     // Drag starts are hit-tested where the button went down, not where the

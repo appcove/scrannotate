@@ -36,7 +36,10 @@ pub struct Toolbar {
 
 impl Toolbar {
     pub fn new() -> Self {
-        Self { pos: None, size: Vec2::new(300.0, 700.0) }
+        Self {
+            pos: None,
+            size: Vec2::new(300.0, 700.0),
+        }
     }
 
     pub fn show(
@@ -49,7 +52,11 @@ impl Toolbar {
         // Initial region selection shows nothing but the frozen frame and
         // the crosshairs — no toolbar until a region exists (and no picker
         // left behind to pop back up later).
-        let Some(ss) = editor.doc.region.map(|r| editor.view.rect_to_screen(canvas, r)) else {
+        let Some(ss) = editor
+            .doc
+            .region
+            .map(|r| editor.view.rect_to_screen(canvas, r))
+        else {
             editor.color_picker = None;
             return None;
         };
@@ -119,16 +126,14 @@ impl Toolbar {
                         ui.horizontal(|ui| {
                             for (tool, key) in pair {
                                 let active = editor.tool == *tool;
-                                let text =
-                                    RichText::new(format!("{key:?} · {}", tool.label()))
-                                        .size(15.0)
-                                        .color(if active {
-                                            Color32::WHITE
-                                        } else {
-                                            Color32::from_gray(235)
-                                        });
-                                let mut btn =
-                                    Button::new(text).min_size(Vec2::new(half, 36.0));
+                                let text = RichText::new(format!("{key:?} · {}", tool.label()))
+                                    .size(15.0)
+                                    .color(if active {
+                                        Color32::WHITE
+                                    } else {
+                                        Color32::from_gray(235)
+                                    });
+                                let mut btn = Button::new(text).min_size(Vec2::new(half, 36.0));
                                 if active {
                                     btn = btn.fill(ACTIVE_TOOL_FILL);
                                 }
@@ -165,7 +170,8 @@ impl Toolbar {
                     // Current color; click to open the picker.
                     let (swatch_rect, swatch) = ui
                         .allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
-                    ui.painter().rect_filled(swatch_rect, 4.0, shown_style.color);
+                    ui.painter()
+                        .rect_filled(swatch_rect, 4.0, shown_style.color);
                     ui.painter().rect_stroke(
                         swatch_rect,
                         4.0,
@@ -179,7 +185,11 @@ impl Toolbar {
                         Align2::CENTER_CENTER,
                         "Color…",
                         FontId::proportional(15.0),
-                        if luma > 140.0 { Color32::BLACK } else { Color32::WHITE },
+                        if luma > 140.0 {
+                            Color32::BLACK
+                        } else {
+                            Color32::WHITE
+                        },
                     );
                     if swatch.clicked() {
                         editor.color_picker = Some(shown_style.color);
@@ -214,29 +224,27 @@ impl Toolbar {
                     ui.separator();
 
                     // Paired action buttons.
-                    let pair = |ui: &mut egui::Ui,
-                                    a: (&str, bool),
-                                    b: (&str, bool)|
-                     -> (bool, bool) {
-                        let mut clicked = (false, false);
-                        ui.horizontal(|ui| {
-                            for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
-                                let btn = ui.add_enabled(
-                                    enabled,
-                                    Button::new(label).min_size(Vec2::new(half, 34.0)),
-                                );
-                                if btn.clicked() {
-                                    btn.surrender_focus();
-                                    if i == 0 {
-                                        clicked.0 = true;
-                                    } else {
-                                        clicked.1 = true;
+                    let pair =
+                        |ui: &mut egui::Ui, a: (&str, bool), b: (&str, bool)| -> (bool, bool) {
+                            let mut clicked = (false, false);
+                            ui.horizontal(|ui| {
+                                for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
+                                    let btn = ui.add_enabled(
+                                        enabled,
+                                        Button::new(label).min_size(Vec2::new(half, 34.0)),
+                                    );
+                                    if btn.clicked() {
+                                        btn.surrender_focus();
+                                        if i == 0 {
+                                            clicked.0 = true;
+                                        } else {
+                                            clicked.1 = true;
+                                        }
                                     }
                                 }
-                            }
-                        });
-                        clicked
-                    };
+                            });
+                            clicked
+                        };
                     let (undo, redo) = pair(
                         ui,
                         ("Undo  Ctrl+Z", editor.doc.can_undo()),
@@ -256,16 +264,14 @@ impl Toolbar {
                         editor.reset_all();
                     }
                     ui.separator();
-                    let (copy, copy_close) =
-                        pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
+                    let (copy, copy_close) = pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
                     if copy_close {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
-                    let (save, save_close) =
-                        pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
+                    let (save, save_close) = pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }
@@ -300,13 +306,14 @@ impl Toolbar {
                             }
                         },
                     };
-                    egui::Frame::default().fill(bg).corner_radius(4.0).inner_margin(8.0).show(
-                        ui,
-                        |ui| {
+                    egui::Frame::default()
+                        .fill(bg)
+                        .corner_radius(4.0)
+                        .inner_margin(8.0)
+                        .show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             ui.label(RichText::new(message).color(fg).size(13.0));
-                        },
-                    );
+                        });
                 });
             });
         self.size = area.response.rect.size();

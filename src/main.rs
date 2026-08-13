@@ -22,19 +22,19 @@ use clap::Parser;
 /// Screenshot + annotation tool. Captures one screen per shot as a raw
 /// frame (no encoding, no disk round-trip — fast) and edits it in place.
 /// Screens are numbered: on Linux/Wayland the first use of a number shows
-/// the portal's chooser once and remembers your pick; on macOS and Windows
-/// numbers simply follow the display list (--pick-screen shows it).
+/// the portal's chooser once and remembers your pick; on X11, macOS, and
+/// Windows numbers simply follow the display list (--pick-screen shows it).
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Which screen to capture. Linux: the first use of a number asks you
-    /// to pick the monitor it means (the grant persists). macOS/Windows:
-    /// the Nth display, primary first.
+    /// Which screen to capture. Wayland: the first use of a number asks
+    /// you to pick the monitor it means (the grant persists).
+    /// X11/macOS/Windows: the Nth display, primary first.
     #[arg(long, value_name = "N", default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
     screen: u32,
 
-    /// Linux: re-open the monitor chooser to re-bind this screen slot.
-    /// macOS/Windows: list the numbered screens and exit.
+    /// Wayland: re-open the monitor chooser to re-bind this screen slot.
+    /// X11/macOS/Windows: list the numbered screens and exit.
     #[arg(long)]
     pick_screen: bool,
 
@@ -125,8 +125,14 @@ fn main() -> Result<()> {
 
     // Where monitors are enumerable, --pick-screen is a listing, not a
     // chooser: screen numbers are deterministic, so show what they mean.
+    // On Linux that's an X11 session; under Wayland the flag instead
+    // re-opens the portal chooser inside capture().
     #[cfg(any(target_os = "macos", windows))]
-    if cli.pick_screen && cli.from_file.is_none() && !demo {
+    let enumerable = true;
+    #[cfg(target_os = "linux")]
+    let enumerable = !capture::is_wayland_session();
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    if enumerable && cli.pick_screen && cli.from_file.is_none() && !demo {
         print!("{}", capture::screen_list()?);
         return Ok(());
     }
