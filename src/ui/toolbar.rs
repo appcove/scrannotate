@@ -4,8 +4,8 @@
 //! confirmation). Auto-placed beside the region, draggable by its grip.
 
 use eframe::egui::{
-    self, Align2, Button, Color32, Context, FontId, Id, Pos2, Rect, RichText, Sense, Slider,
-    Stroke, StrokeKind, Vec2,
+    self, Align2, Button, Color32, Context, CornerRadius, FontId, Id, Pos2, Rect, RichText, Sense,
+    Slider, Stroke, StrokeKind, Vec2,
 };
 
 use crate::annotate::Tool;
@@ -84,10 +84,21 @@ impl Toolbar {
                     spacing.interact_size = Vec2::new(40.0, 34.0);
                     let visuals = ui.visuals_mut();
                     visuals.widgets.inactive.weak_bg_fill = Color32::from_gray(58);
+                    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, Color32::from_gray(75));
                     visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_gray(235));
                     visuals.widgets.hovered.weak_bg_fill = Color32::from_gray(80);
+                    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, ACCENT);
                     visuals.widgets.hovered.fg_stroke = Stroke::new(1.5, Color32::WHITE);
                     visuals.widgets.active.weak_bg_fill = Color32::from_gray(96);
+                    // Rounded, modern-looking buttons instead of egui's default sharp corners.
+                    for style in [
+                        &mut visuals.widgets.inactive,
+                        &mut visuals.widgets.hovered,
+                        &mut visuals.widgets.active,
+                        &mut visuals.widgets.open,
+                    ] {
+                        style.corner_radius = CornerRadius::same(7);
+                    }
                     let styles = &mut ui.style_mut().text_styles;
                     if let Some(font) = styles.get_mut(&egui::TextStyle::Button) {
                         font.size = 15.0;
@@ -213,18 +224,22 @@ impl Toolbar {
                     }
                     ui.separator();
 
-                    // Paired action buttons.
+                    // Paired action buttons. `accent` fills the button so
+                    // the two primary "ship" actions (Copy+Close/Save+Close)
+                    // read as the default action rather than equal-weight
+                    // siblings of Copy/Save.
                     let pair = |ui: &mut egui::Ui,
-                                    a: (&str, bool),
-                                    b: (&str, bool)|
+                                    a: (&str, bool, bool),
+                                    b: (&str, bool, bool)|
                      -> (bool, bool) {
                         let mut clicked = (false, false);
                         ui.horizontal(|ui| {
-                            for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
-                                let btn = ui.add_enabled(
-                                    enabled,
-                                    Button::new(label).min_size(Vec2::new(half, 34.0)),
-                                );
+                            for (i, (label, enabled, accent)) in [a, b].into_iter().enumerate() {
+                                let mut btn = Button::new(label).min_size(Vec2::new(half, 34.0));
+                                if accent {
+                                    btn = btn.fill(ACCENT);
+                                }
+                                let btn = ui.add_enabled(enabled, btn);
                                 if btn.clicked() {
                                     btn.surrender_focus();
                                     if i == 0 {
@@ -239,8 +254,8 @@ impl Toolbar {
                     };
                     let (undo, redo) = pair(
                         ui,
-                        ("Undo  Ctrl+Z", editor.doc.can_undo()),
-                        ("Redo  Ctrl+Y", editor.doc.can_redo()),
+                        ("Undo  Ctrl+Z", editor.doc.can_undo(), false),
+                        ("Redo  Ctrl+Y", editor.doc.can_redo(), false),
                     );
                     if undo {
                         editor.undo();
@@ -248,7 +263,8 @@ impl Toolbar {
                     if redo {
                         editor.redo();
                     }
-                    let (fit, reset) = pair(ui, ("Reset view  F", true), ("Reset all", true));
+                    let (fit, reset) =
+                        pair(ui, ("Reset view  F", true, false), ("Reset all", true, false));
                     if fit {
                         editor.view.fit(editor.doc.image_size(), canvas.size());
                     }
@@ -257,7 +273,7 @@ impl Toolbar {
                     }
                     ui.separator();
                     let (copy, copy_close) =
-                        pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
+                        pair(ui, ("Copy", true, false), ("Copy+Close  Ctrl+C", true, true));
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
@@ -265,7 +281,7 @@ impl Toolbar {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
                     let (save, save_close) =
-                        pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
+                        pair(ui, ("Save", true, false), ("Save+Close  Ctrl+S", true, true));
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mac App Store entitlements. The App Sandbox is mandatory for MAS.
+
+  - app-sandbox:            required by the Mac App Store.
+  - assets.pictures.rw:     scrannotate saves PNGs to ~/Pictures/Screenshots
+                            without a save dialog; the sandbox blocks that
+                            unless we hold the Pictures-folder entitlement.
+                            (If review rejects this, switch Ctrl+S to an
+                            NSSavePanel and use files.user-selected instead.)
+  Screen Recording itself needs NO entitlement — ScreenCaptureKit is gated at
+  runtime by TCC (the user grant), which works inside the sandbox. No network
+  entitlement: scrannotate never touches the network.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.assets.pictures.read-write</key>
+    <true/>
+</dict>
+</plist>

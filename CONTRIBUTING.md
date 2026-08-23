@@ -64,6 +64,17 @@ green on every platform; match the style of the surrounding code. CI
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is
 pushed.
 
+On macOS, `./build.sh` builds a release binary and assembles/ad-hoc signs
+`scrannotate.app` locally the same way the release workflow does
+(`packaging/macos/bundle.sh`); pass `--universal` for an arm64+x86_64
+binary. Windows and Linux release binaries are produced by CI, not this
+script.
+
+Publishing to the **Mac App Store** and **Microsoft Store** (a separate,
+sandboxed signing path from the direct-download builds above) is documented
+in [docs/SIGNING.md](docs/SIGNING.md), with packaging scripts under
+`packaging/` and an opt-in `.github/workflows/store-release.yml`.
+
 ## Testing UI changes
 
 The annotator can be exercised without a live capture:

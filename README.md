@@ -139,6 +139,22 @@ launch the app the same way. Expect macOS 15+ to re-confirm screen-recording
 apps roughly monthly; every capture tool gets the same treatment. Keyboard
 shortcuts read as `Ctrl` below but are the `⌘` key on macOS.
 
+**Binding a hotkey** — macOS keyboard shortcuts can't run a shell command
+directly, so wrap the launch in a Shortcuts.app quick action:
+
+1. Open **Shortcuts.app** → **+** (New Shortcut).
+2. Search the action library for **Run Shell Script**, drag it in, and set
+   it to `/bin/zsh` with the command
+   `open -a scrannotate --args --screen 1` (change `--screen` per hotkey).
+3. Click the shortcut's name at the top, rename it (e.g. `Scrannotate
+   Screen 1`), then open its **Details** (`ⓘ`) and enable
+   **Use as Quick Action** → **Services**.
+4. In **System Settings → Keyboard → Keyboard Shortcuts → Services**, find
+   the new shortcut under *General* and assign a key combination (e.g.
+   `⌘⇧4`... pick something not already bound).
+
+Repeat with a different `--screen N` for a second monitor's hotkey.
+
 ### Windows
 
 Windows 10 1903+ (Windows Graphics Capture, with a DXGI fallback — note the

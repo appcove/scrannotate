@@ -131,7 +131,7 @@ impl Editor {
             EditorState::Idle => {
                 if self.doc.region.is_none() {
                     return hint(
-                        "Drag out a region · Enter: copy whole screen · scroll: zoom",
+                        "Drag out a region · Enter: copy whole screen · scroll: zoom · Esc Esc: discard",
                     );
                 }
                 match self.tool {
@@ -143,7 +143,7 @@ impl Editor {
                         ),
                     ),
                     Tool::Select => hint(
-                        "Drag a box to select · Shift+drag: add · click an item · right-drag: new region",
+                        "Drag a box to select · Shift+drag: add · click an item · right-drag: new region · Esc Esc: discard",
                     ),
                     Tool::Text => hint("Click to place text · click existing text to edit it"),
                     Tool::Marker => (
@@ -481,6 +481,14 @@ impl Editor {
         let img_rect = self.doc.image_rect();
         let clamped = p.clamp(img_rect.min, img_rect.max);
 
+        // Nothing to annotate yet: every tool's first drag draws the
+        // region instead (the toolbar itself only appears once one exists,
+        // so any other tool's gesture here would be invisible).
+        if self.doc.region.is_none() {
+            self.begin_region_draw(clamped);
+            return;
+        }
+
         if self.tool == Tool::Select {
             // 1. Handles of the single selected item.
             if let Some(kind) = self.handle_under(screen, canvas, measure)
@@ -554,15 +562,10 @@ impl Editor {
                 };
                 return;
             }
-            // 5. Empty space. With no region yet, the first drag draws one
-            //    (the capture-setup flow); once a region exists, a plain drag
-            //    rubber-band-selects — replacing the selection. Move the
-            //    region with its grip (rung 2), redraw it with a right-drag.
-            if self.doc.region.is_none() {
-                self.begin_region_draw(clamped);
-            } else {
-                self.state = EditorState::RubberBand { anchor: p, current: p, additive: false };
-            }
+            // 5. Empty space: a plain drag rubber-band-selects, replacing
+            //    the selection. Move the region with its grip (rung 2),
+            //    redraw it with a right-drag.
+            self.state = EditorState::RubberBand { anchor: p, current: p, additive: false };
             return;
         }
 
@@ -691,8 +694,11 @@ impl Editor {
         }
         self.dismiss_transient();
         match self.tool {
-            Tool::Text => self.text_tool_click(p, measure),
-            Tool::Marker => self.drop_marker(p, None),
+            // Nothing to place on yet — a region doesn't exist to hold it
+            // (and the toolbar that would show it doesn't either).
+            Tool::Text if self.doc.region.is_some() => self.text_tool_click(p, measure),
+            Tool::Marker if self.doc.region.is_some() => self.drop_marker(p, None),
+            Tool::Text | Tool::Marker => {}
             Tool::Select => {
                 if let Some(id) = topmost_hit(&self.doc, p, false, self.view.zoom, measure) {
                     if mods.command || mods.shift {
@@ -1006,6 +1012,7 @@ mod tests {
     #[test]
     fn draw_rect_lifecycle_creates_one_undo_step() {
         let mut ed = editor();
+        ed.doc.region = Some(ed.doc.image_rect());
         ed.set_tool(Tool::Rect);
         ed.primary_drag_start(
             Pos2::new(10.0, 10.0),
@@ -1027,6 +1034,7 @@ mod tests {
     #[test]
     fn escape_reverts_item_drag_without_history() {
         let mut ed = editor();
+        ed.doc.region = Some(ed.doc.image_rect());
         let r = Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(200.0, 150.0));
         let id = add_highlight(&mut ed, r);
         let undo_before = ed.doc.can_undo();
@@ -1078,6 +1086,8 @@ mod tests {
             &mut ed,
             Rect::from_min_max(Pos2::new(400.0, 400.0), Pos2::new(420.0, 420.0)),
         );
+        // Away from the drag points below, so its edges/grip don't intercept them.
+        ed.doc.region = Some(Rect::from_min_max(Pos2::new(-1000.0, -1000.0), Pos2::new(1000.0, 1000.0)));
         ed.set_tool(Tool::Select);
         ed.primary_drag_start(
             Pos2::new(0.0, 0.0),
@@ -1144,10 +1154,52 @@ mod tests {
     }
 
     #[test]
+    fn drawing_tool_still_draws_the_region_first() {
+        // A drawing tool picked before any region exists (e.g. its keyboard
+        // shortcut, hit before ever dragging one out) must not start an
+        // invisible annotation — the toolbar that would show it doesn't
+        // appear until a region exists either.
+        let mut ed = editor();
+        ed.set_tool(Tool::Line);
+        assert!(ed.doc.region.is_none());
+        ed.primary_drag_start(
+            Pos2::new(50.0, 50.0),
+            Pos2::new(50.0, 50.0),
+            canvas(),
+            Modifiers::NONE,
+            &measure,
+        );
+        assert!(matches!(ed.state, EditorState::RegionDraw { .. }));
+        ed.pointer_moved(Pos2::new(150.0, 150.0));
+        ed.pointer_up(&measure);
+        assert!(ed.doc.region.is_some());
+        assert_eq!(ed.doc.annotations().len(), 0);
+    }
+
+    #[test]
+    fn text_and_marker_clicks_are_ignored_without_a_region() {
+        let mut ed = editor();
+        for tool in [Tool::Text, Tool::Marker] {
+            ed.set_tool(tool);
+            ed.click(
+                Pos2::new(50.0, 50.0),
+                Pos2::new(50.0, 50.0),
+                canvas(),
+                Modifiers::NONE,
+                &measure,
+            );
+        }
+        assert!(ed.doc.region.is_none());
+        assert_eq!(ed.doc.annotations().len(), 0);
+        assert!(!ed.state.is_text_editing());
+    }
+
+    #[test]
     fn shift_drag_adds_to_the_selection() {
         let mut ed = editor();
         let a = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(130.0, 130.0)));
         let b = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(150.0, 100.0), Pos2::new(180.0, 130.0)));
+        ed.doc.region = Some(ed.doc.image_rect());
         ed.set_tool(Tool::Select);
         ed.selected.insert(a);
         // Shift+drag a band over b only (well clear of a's handles).
@@ -1417,6 +1469,7 @@ mod tests {
         let mut ed = editor();
         let a = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(10.0, 10.0), Pos2::new(30.0, 30.0)));
         let b = add_highlight(&mut ed, Rect::from_min_max(Pos2::new(50.0, 10.0), Pos2::new(70.0, 30.0)));
+        ed.doc.region = Some(ed.doc.image_rect());
         ed.set_tool(Tool::Select);
         ed.selected.insert(a);
         ed.selected.insert(b);
