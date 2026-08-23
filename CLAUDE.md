@@ -75,6 +75,9 @@ Data flows capture → `Document` → `Editor` state machine → `ui` painters �
 | `ui/` | All painting: `canvas.rs`, `toolbar.rs`, `paint.rs`, `color_picker.rs`, `text_overlay.rs`. No interaction logic. |
 | `export.rs` | tiny-skia rasterizer for save/copy; shares geometry with `annotate` so PNG output is pixel-identical to the screen. |
 | `prefs.rs` | Tiny `key=value` file (recent colors; stroke/font size only once deliberately changed) in the platform state dir. |
+| `hotkey.rs` | `--setup-hotkey`: turns a chosen combo into an OS launch binding (auto-installs on GNOME via `gsettings`, prints exact setup elsewhere). Combo parsing + per-platform rendering are pure/unit-tested. |
+| `tray.rs` | `--tray`, and the default for a **bare launch** on macOS/Windows: a windowless winit supervisor with a `tray-icon` menubar icon + `global-hotkey`. On hotkey/menu it **spawns a fresh capture** (`current_exe --screen N`) — never runs egui itself, so it doesn't fight eframe's loop. OS event handlers wake the loop via an `EventLoopProxy`. Reads its hotkey from `prefs`; re-registers it when the settings window closes. |
+| `settings.rs` | `--settings` (macOS/Windows): a tiny eframe window (its own short-lived process, launched from the tray's "Set hotkey…") that records a key combo and writes it to `prefs`. Uses this fork's `eframe::App::ui(&mut self, root: &mut Ui, frame)` signature — panels take a `Ui`, not a `Context`. |
 | `clipboard.rs`, `view.rs` | Clipboard put (Linux forks `wl-copy`); pan/zoom transform. |
 
 ### Invariants worth preserving

@@ -1,3 +1,6 @@
 /target
 /dist
 .DS_Store
+# Intermediate icon build artifacts; the committed deliverable is
+# packaging/macos/AppIcon.icns (the tray icon is drawn at runtime).
+/scrannotate.iconset/

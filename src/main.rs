@@ -10,6 +10,11 @@ mod clipboard;
 mod document;
 mod editor;
 mod export;
+mod hotkey;
+#[cfg(any(target_os = "macos", windows))]
+mod settings;
+#[cfg(any(target_os = "macos", windows))]
+mod tray;
 mod prefs;
 mod ui;
 mod view;
@@ -53,6 +58,28 @@ struct Cli {
     /// Annotate an existing image instead of capturing the screen.
     #[arg(long, value_name = "PATH")]
     from_file: Option<PathBuf>,
+
+    /// Set up a system hotkey that launches scrannotate, then exit. On GNOME
+    /// the binding is installed automatically; elsewhere the exact one-time
+    /// setup for your platform is printed. Pair with --combo and --screen.
+    #[arg(long)]
+    setup_hotkey: bool,
+
+    /// The key combination for --setup-hotkey / --tray, e.g. "Ctrl+Shift+S"
+    /// or "Cmd+Shift+4". Any modifier(s) plus one key.
+    #[arg(long, value_name = "COMBO", default_value = "Ctrl+Shift+S")]
+    combo: String,
+
+    /// macOS/Windows: run resident in the tray/menubar. The saved hotkey (or
+    /// the tray menu) launches a capture; the process stays until you quit it.
+    /// A bare launch with no arguments does this too.
+    #[arg(long)]
+    tray: bool,
+
+    /// macOS/Windows: open the hotkey settings window (used by the tray's
+    /// "Set hotkey…" item), then exit.
+    #[arg(long)]
+    settings: bool,
 }
 
 fn default_output_dir() -> PathBuf {
@@ -116,7 +143,54 @@ fn main() -> Result<()> {
         AttachConsole(ATTACH_PARENT_PROCESS);
     }
 
+    // A bare launch (double-clicking the app, no arguments) opens the tray on
+    // macOS/Windows — scrannotate then lives in the menubar and a hotkey pops a
+    // capture. Explicit arguments (including the ones the tray itself passes
+    // to spawn a capture) skip this, as does the env-driven docs demo. Linux
+    // has no tray, so it still captures.
+    let bare_launch =
+        std::env::args_os().count() == 1 && std::env::var_os("SCRANNOTATE_DEMO").is_none();
+
     let cli = Cli::parse();
+
+    // Hotkey setup is a launcher-config action, not a capture: install (or
+    // print) the binding for the chosen combination and exit before any
+    // screen work happens.
+    if cli.setup_hotkey {
+        return hotkey::setup(&cli.combo, cli.screen);
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        if cli.settings {
+            return settings::run();
+        }
+        // Resident tray/menubar launcher. Blocks until quit. The hotkey comes
+        // from prefs (set in the Settings window), falling back to --combo.
+        if cli.tray || bare_launch {
+            let saved_prefs = prefs::load();
+            // The very first launch also fires one capture so the app shows
+            // what it does; every later launch just sits in the tray.
+            let first_run = !saved_prefs.launched;
+            if first_run {
+                prefs::mark_launched();
+            }
+            let saved = saved_prefs.hotkey.clone().unwrap_or_else(|| cli.combo.clone());
+            let combo = hotkey::Combo::parse(&saved)
+                .or_else(|_| hotkey::Combo::parse(tray::DEFAULT_COMBO))?;
+            return tray::run(combo, cli.screen, first_run);
+        }
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        if cli.tray {
+            return Err(anyhow!(
+                "--tray is macOS/Windows only; on Linux bind a launch hotkey with --setup-hotkey"
+            ));
+        }
+        let _ = bare_launch; // Linux: a bare launch captures, as before.
+    }
+
     // Docs/dev hook: SCRANNOTATE_DEMO renders a canned scene (pair with
     // SCRANNOTATE_SHOT to save a window screenshot and exit). Read once and
     // passed down so the two layers can't disagree about demo mode.

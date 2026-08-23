@@ -8,6 +8,8 @@
     <string>scrannotate</string>
     <key>CFBundleExecutable</key>
     <string>scrannotate</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.appcove.scrannotate</string>
     <key>CFBundleInfoDictionaryVersion</key>

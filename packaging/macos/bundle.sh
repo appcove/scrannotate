@@ -26,9 +26,15 @@ staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
 app="$staging/scrannotate.app"
 
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary" "$app/Contents/MacOS/scrannotate"
 cp "$(dirname "$0")/Info.plist" "$app/Contents/Info.plist"
+# The app icon (Info.plist's CFBundleIconFile points at AppIcon). Optional so a
+# checkout without it still bundles; Finder just falls back to a generic icon.
+icon="$(dirname "$0")/AppIcon.icns"
+if [[ -f "$icon" ]]; then
+  cp "$icon" "$app/Contents/Resources/AppIcon.icns"
+fi
 for key in CFBundleShortVersionString CFBundleVersion; do
   /usr/libexec/PlistBuddy -c "Set :$key $version" "$app/Contents/Info.plist"
 done

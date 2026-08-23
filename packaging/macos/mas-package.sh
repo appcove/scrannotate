@@ -61,9 +61,27 @@ else
   echo "warning: $here/AppIcon.icns missing — the Store requires an icon" >&2
 fi
 
-# Sign the app with the sandbox entitlements, then wrap + sign the installer.
+# Mac App Store apps must also carry the application-identifier and
+# team-identifier entitlements (Xcode injects these; manual signing must add
+# them, or the upload is rejected for a missing entitlement). Derive the team
+# id from the signing cert's "(TEAMID)" suffix and the bundle id from the
+# Info.plist, then layer them onto the base sandbox entitlements.
+team_id="$(sed -nE 's/.*\(([A-Z0-9]+)\)[[:space:]]*$/\1/p' <<< "$MAS_APP_CERT")"
+bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+full_entitlements="$staging/mas.full.entitlements"
+cp "$entitlements" "$full_entitlements"
+if [[ -n "$team_id" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $team_id.$bundle_id" "$full_entitlements"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $team_id" "$full_entitlements"
+else
+  echo "warning: could not read a team id from MAS_APP_CERT ('$MAS_APP_CERT');" \
+       "the app will lack the application-identifier entitlement and the" \
+       "App Store upload will likely be rejected." >&2
+fi
+
+# Sign the app with the full entitlements, then wrap + sign the installer.
 codesign --force --timestamp --options runtime \
-  --entitlements "$entitlements" \
+  --entitlements "$full_entitlements" \
   --sign "$MAS_APP_CERT" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 

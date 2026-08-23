@@ -37,6 +37,11 @@ pub struct Prefs {
     pub palette: Option<Vec<Color32>>,
     pub width: Option<f32>,
     pub font_size: Option<f32>,
+    /// The tray's launch hotkey, e.g. `Cmd+Shift+4` (set in Settings).
+    pub hotkey: Option<String>,
+    /// Set once the app has run at least once, so the first launch can capture
+    /// immediately (show what it does) while later launches just sit in the tray.
+    pub launched: bool,
 }
 
 fn parse_color(hex: &str) -> Option<Color32> {
@@ -73,26 +78,86 @@ pub fn load() -> Prefs {
                 prefs.font_size =
                     value.trim().parse().ok().filter(|s| (6.0..=400.0).contains(s));
             }
+            "hotkey" => {
+                let v = value.trim();
+                if !v.is_empty() {
+                    prefs.hotkey = Some(v.to_string());
+                }
+            }
+            "launched" => prefs.launched = value.trim() == "1",
             _ => {}
         }
     }
     prefs
 }
 
-/// `style: None` keeps sizes out of the file (they stay session defaults).
-pub fn save(palette: &[Color32], style: Option<&Style>) {
+/// Serialize the whole `Prefs` back to the file (only the `Some` fields
+/// produce lines). One writer so every caller preserves the fields it does
+/// not itself own — e.g. saving the palette must not drop the hotkey.
+fn write_all(prefs: &Prefs) {
     let Some(path) = prefs_path() else { return };
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let palette_line =
-        palette.iter().map(|c| format_color(*c)).collect::<Vec<_>>().join(",");
-    let mut contents = format!("palette={palette_line}\n");
-    if let Some(style) = style {
-        contents.push_str(&format!("width={}\nfont_size={}\n", style.width, style.font_size));
+    let mut contents = String::new();
+    if let Some(palette) = &prefs.palette {
+        let line = palette.iter().map(|c| format_color(*c)).collect::<Vec<_>>().join(",");
+        contents.push_str(&format!("palette={line}\n"));
+    }
+    if let Some(width) = prefs.width {
+        contents.push_str(&format!("width={width}\n"));
+    }
+    if let Some(font_size) = prefs.font_size {
+        contents.push_str(&format!("font_size={font_size}\n"));
+    }
+    if let Some(hotkey) = &prefs.hotkey {
+        contents.push_str(&format!("hotkey={hotkey}\n"));
+    }
+    if prefs.launched {
+        contents.push_str("launched=1\n");
     }
     if let Err(err) = std::fs::write(&path, contents) {
         eprintln!("warning: could not persist preferences: {err}");
+    }
+}
+
+/// `style: None` keeps sizes out of the file (they stay session defaults).
+/// The hotkey is carried over from disk so the editor's saves don't drop it.
+pub fn save(palette: &[Color32], style: Option<&Style>) {
+    let mut prefs = load();
+    prefs.palette = Some(palette.to_vec());
+    match style {
+        Some(style) => {
+            prefs.width = Some(style.width);
+            prefs.font_size = Some(style.font_size);
+        }
+        // Untouched sizes are never written (a small capture's defaults must
+        // not leak into a 4K session); existing on-disk sizes are dropped too,
+        // matching the original single-writer behavior.
+        None => {
+            prefs.width = None;
+            prefs.font_size = None;
+        }
+    }
+    write_all(&prefs);
+}
+
+/// Persist the tray hotkey, preserving palette/sizes already on disk.
+#[cfg(any(target_os = "macos", windows))]
+pub fn save_hotkey(combo: &str) {
+    let mut prefs = load();
+    prefs.hotkey = Some(combo.to_string());
+    write_all(&prefs);
+}
+
+/// Record that the app has now run once (so later launches skip the
+/// first-run capture). No-op if already set.
+#[cfg(any(target_os = "macos", windows))]
+pub fn mark_launched() {
+    let mut prefs = load();
+    if !prefs.launched {
+        prefs.launched = true;
+        write_all(&prefs);
     }
 }
 

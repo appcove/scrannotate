@@ -1,6 +1,6 @@
 [package]
 name = "scrannotate"
-version = "0.4.0"
+version = "1.0.0"
 edition = "2024"
 description = "Screenshot annotation tool: capture a screen, select, annotate in place, copy or save"
 license = "Apache-2.0"
@@ -39,8 +39,15 @@ tracing-subscriber = { version = "0.3", optional = true }
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 dirs = "6.0.0"
 # The same winit eframe uses — direct access for matching the captured
-# monitor and for macOS "simple fullscreen" (app.rs, main.rs).
+# monitor and for macOS "simple fullscreen" (app.rs, main.rs), and the
+# resident tray supervisor's event loop (--tray, tray.rs).
 winit = { version = "0.30", default-features = false }
+# Resident tray/menubar launcher (--tray): a global hotkey + tray icon that
+# spawn a fresh one-shot capture. macOS/Windows only — Linux uses
+# --setup-hotkey instead (a Linux tray would need GTK, and Wayland forbids
+# app-owned global hotkeys).
+tray-icon = "0.19"
+global-hotkey = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 # AttachConsole, so the windows-subsystem binary still prints in a terminal.

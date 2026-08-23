@@ -167,14 +167,59 @@ a known limitation of BGRA8 capture. Bind a hotkey via a shortcut file's
 ## Usage
 
 ```
-scrannotate                      # capture screen 1, select a region, annotate in place
-scrannotate --screen 2           # capture screen 2
+scrannotate                      # Linux: capture screen 1. macOS/Windows: park in the tray
+scrannotate --screen 2           # capture screen 2 now
+scrannotate --tray               # macOS/Windows: force tray mode (same as a bare launch)
 scrannotate --pick-screen        # Linux: re-bind what "screen N" means; macOS/Windows: list screens
 scrannotate --cursor             # include the mouse cursor in the capture
 scrannotate --delay 3            # wait 3s before capturing (open that menu first)
 scrannotate --save-path DIR      # where Ctrl+S saves (default ~/Pictures/Screenshots)
 scrannotate --from-file img.png  # annotate an existing image (no capture)
+scrannotate --setup-hotkey       # Linux: bind a launch hotkey (GNOME: auto; else prints steps)
+scrannotate --setup-hotkey --combo "Cmd+Shift+4" --screen 2   # any combination
 ```
+
+### Binding a launch hotkey
+
+Because scrannotate is one-shot — a keypress *launches* it (there is no
+background process), so the hotkey lives in the OS. `--setup-hotkey` sets it
+up for the combination you choose (`--combo`, default `Ctrl+Shift+S`) and the
+screen you want (`--screen`):
+
+- **GNOME** (X11 or Wayland): the binding is installed automatically via
+  `gsettings` — remove/edit it later under Settings → Keyboard → Keyboard
+  Shortcuts → Custom Shortcuts.
+- **macOS, Windows, KDE, wlroots**: it prints the exact one-time setup for
+  that combo (Shortcuts.app / AutoHotkey / your compositor config). On
+  Wayland only the compositor can own a global shortcut, never the app — this
+  is by design, not a scrannotate limitation.
+
+#### Resident tray (macOS & Windows)
+
+On macOS and Windows, **just opening scrannotate** (double-clicking the app,
+or running it with no arguments) parks it in the menubar/tray — shown as the
+scrannotate logo, no Dock icon on macOS. The **very first** launch also takes a
+shot right away so you see what it does; every launch after that just sits
+quietly in the tray until the hotkey. Its menu has:
+
+- **Capture screen N** — take a shot now (also fired by the global hotkey);
+- **Set hotkey…** — a small window to record any key combination you like
+  (press the keys; it saves and applies immediately);
+- **Quit scrannotate**.
+
+The hotkey (default **Ctrl+Shift+S**, `⌘` on macOS) pops a fresh capture from
+anywhere; finishing or closing that shot just returns you to the tray. Each
+capture is a separate one-shot instance, so it stays as fast and
+crash-isolated as launching from a hotkey. Pin scrannotate at login with a
+Login Item (macOS) or a Startup shortcut (Windows) to have the tray always
+ready.
+
+The tray registers a real global hotkey (`RegisterEventHotKey` on macOS,
+`RegisterHotKey` on Windows) — no Accessibility permission needed; only the
+capture itself prompts for Screen Recording, as always. To capture from the
+command line instead (e.g. from a hotkey tool), pass a screen explicitly:
+`scrannotate --screen 1`. Linux has no tray (a tray would need GTK and Wayland
+blocks app-owned hotkeys); use `--setup-hotkey` there.
 
 On Linux, the first use of each screen slot shows the desktop's
 screen-share dialog — that's where you decide which monitor the number
