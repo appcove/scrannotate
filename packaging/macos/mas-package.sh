@@ -21,14 +21,18 @@
 # both live beside this script once you add the icon (see docs/SIGNING.md).
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "usage: $0 <binary> <version> <output.pkg>" >&2
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+  echo "usage: $0 <binary> <version> <output.pkg> [build]" >&2
+  echo "  version  CFBundleShortVersionString (e.g. 1.0.0)" >&2
+  echo "  build    CFBundleVersion — must increase for each App Store upload;" >&2
+  echo "           defaults to <version>" >&2
   exit 2
 fi
 
 binary="$1"
 version="$2"
 output="$3"
+build="${4:-$version}"
 here="$(cd "$(dirname "$0")" && pwd)"
 
 for var in MAS_APP_CERT MAS_INSTALLER_CERT MAS_PROVISION; do
@@ -50,9 +54,8 @@ app="$staging/scrannotate.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$binary" "$app/Contents/MacOS/scrannotate"
 cp "$here/Info.plist" "$app/Contents/Info.plist"
-for key in CFBundleShortVersionString CFBundleVersion; do
-  /usr/libexec/PlistBuddy -c "Set :$key $version" "$app/Contents/Info.plist"
-done
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$app/Contents/Info.plist"
 # App Store builds must embed the provisioning profile and an icon.
 cp "$MAS_PROVISION" "$app/Contents/embedded.provisionprofile"
 if [[ -f "$here/AppIcon.icns" ]]; then
@@ -78,6 +81,10 @@ else
        "the app will lack the application-identifier entitlement and the" \
        "App Store upload will likely be rejected." >&2
 fi
+
+# Strip extended attributes (notably com.apple.quarantine, which downloaded
+# certs/profiles/icons carry) — the App Store rejects any quarantine xattr.
+xattr -cr "$app"
 
 # Sign the app with the full entitlements, then wrap + sign the installer.
 codesign --force --timestamp --options runtime \

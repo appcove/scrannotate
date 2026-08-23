@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>scrannotate</string>
+    <string>Scrannotate</string>
     <key>CFBundleExecutable</key>
     <string>scrannotate</string>
     <key>CFBundleIconFile</key>
@@ -17,7 +17,7 @@
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>CFBundleName</key>
-    <string>scrannotate</string>
+    <string>Scrannotate</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
