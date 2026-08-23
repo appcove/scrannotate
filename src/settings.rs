@@ -8,12 +8,16 @@
 
 use anyhow::{Result, anyhow};
 use eframe::egui::{
-    self, Align2, Color32, Event, FontId, Key, Pos2, Rect, RichText, Sense, Shape, Stroke, Vec2,
+    self, Button, Color32, CornerRadius, Event, Key, Margin, RichText, Stroke, TextStyle, Vec2,
     ViewportBuilder, ViewportCommand,
 };
 
-use crate::hotkey::{Combo, Modifier};
+use crate::hotkey::Combo;
 use crate::prefs;
+use crate::ui::ACCENT;
+
+/// Red used for the destructive Close button.
+const DESTRUCTIVE: Color32 = Color32::from_rgb(0xb8, 0x36, 0x36);
 
 /// Show the settings window. Blocks until the user saves or closes it.
 pub fn run() -> Result<()> {
@@ -21,14 +25,21 @@ pub fn run() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: ViewportBuilder::default()
             .with_title("scrannotate — Hotkey")
-            .with_inner_size([440.0, 240.0])
+            .with_inner_size([460.0, 300.0])
             .with_resizable(false),
         ..Default::default()
     };
     eframe::run_native(
         "scrannotate settings",
         options,
-        Box::new(move |_| Ok(Box::new(SettingsApp::new(current)))),
+        Box::new(move |cc| {
+            // Fonts/style must be set before the first frame renders — egui
+            // only applies new fonts on the next frame, so setting them here
+            // (not inside ui()) avoids a first-frame "family not bound" panic.
+            install_system_font(&cc.egui_ctx);
+            install_style(&cc.egui_ctx);
+            Ok(Box::new(SettingsApp::new(current)))
+        }),
     )
     .map_err(|e| anyhow!("running settings window: {e}"))
 }
@@ -96,56 +107,76 @@ impl eframe::App for SettingsApp {
             ctx.request_repaint();
         }
 
-        root.add_space(14.0);
-        root.vertical_centered(|ui| {
-            ui.heading("Launch hotkey");
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new("Pressing this anywhere pops scrannotate to take a screenshot.")
-                    .weak(),
-            );
-            ui.add_space(18.0);
+        // Header, hotkey display, and the record button.
+        egui::Frame::default()
+            .inner_margin(Margin::symmetric(26, 22))
+            .show(root, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.heading("Launch hotkey");
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new("Press this anywhere to pop scrannotate and take a screenshot.")
+                            .weak(),
+                    );
+                    ui.add_space(26.0);
 
-            // The current combo, drawn as key-symbols (egui's fonts can't
-            // render ⌃/⌥/⌘, so we paint them).
-            match Combo::parse(&self.combo) {
-                Ok(combo) => draw_combo(ui, &combo),
-                Err(_) => {
-                    ui.label(RichText::new(&self.combo).size(26.0).strong());
-                }
-            }
-            ui.add_space(12.0);
+                    // The combo in the real system glyphs (⌘/⇧/⌃/⌥).
+                    let shown = Combo::parse(&self.combo)
+                        .map(|c| c.label())
+                        .unwrap_or_else(|_| self.combo.clone());
+                    ui.label(combo_text(shown));
+                    ui.add_space(24.0);
 
-            let label = if self.recording { "Press a combination…" } else { "Record new hotkey" };
-            if ui.button(RichText::new(label).size(15.0)).clicked() {
-                self.recording = !self.recording;
-                self.error = None;
-            }
+                    // Record button: accent-outlined when idle, accent-filled
+                    // while listening.
+                    let text = if self.recording { "Press a combination…" } else { "Record new hotkey" };
+                    let mut btn = Button::new(RichText::new(text).size(15.0).color(Color32::WHITE))
+                        .min_size(Vec2::new(220.0, 36.0));
+                    btn = if self.recording {
+                        btn.fill(ACCENT)
+                    } else {
+                        btn.fill(Color32::from_gray(58)).stroke(Stroke::new(1.5, ACCENT))
+                    };
+                    if ui.add(btn).clicked() {
+                        self.recording = !self.recording;
+                        self.error = None;
+                    }
 
-            if let Some(err) = &self.error {
-                ui.add_space(6.0);
-                ui.colored_label(Color32::from_rgb(220, 90, 90), err);
-            }
-        });
-
-        // Save / Close along the bottom.
-        root.add_space(20.0);
-        root.separator();
-        root.horizontal(|ui| {
-            if ui.button("Close").clicked() {
-                ctx.send_viewport_cmd(ViewportCommand::Close);
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let valid = Combo::parse(&self.combo).is_ok();
-                if ui
-                    .add_enabled(valid, egui::Button::new("Save").min_size(Vec2::new(90.0, 28.0)))
-                    .clicked()
-                {
-                    prefs::save_hotkey(&self.combo);
-                    ctx.send_viewport_cmd(ViewportCommand::Close);
-                }
+                    if let Some(err) = &self.error {
+                        ui.add_space(10.0);
+                        ui.colored_label(Color32::from_rgb(0xe0, 0x82, 0x82), err);
+                    }
+                });
             });
-        });
+
+        // Footer pinned to the bottom: Close (destructive) left, Save right,
+        // matched size and padding.
+        let footer_h = 74.0;
+        root.add_space((root.available_height() - footer_h).max(0.0));
+        root.separator();
+        egui::Frame::default()
+            .inner_margin(Margin { left: 18, right: 18, top: 0, bottom: 22 })
+            .show(root, |ui| {
+                let size = Vec2::new(108.0, 36.0);
+                ui.horizontal(|ui| {
+                    let close = Button::new(RichText::new("Close").color(Color32::WHITE))
+                        .fill(DESTRUCTIVE)
+                        .min_size(size);
+                    if ui.add(close).clicked() {
+                        ctx.send_viewport_cmd(ViewportCommand::Close);
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let valid = Combo::parse(&self.combo).is_ok();
+                        let save = Button::new(RichText::new("Save").color(Color32::WHITE))
+                            .fill(ACCENT)
+                            .min_size(size);
+                        if ui.add_enabled(valid, save).clicked() {
+                            prefs::save_hotkey(&self.combo);
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
+                        }
+                    });
+                });
+            });
 
         // Esc closes without saving — unless we're recording, where Esc is a
         // candidate key press the capture loop already consumed.
@@ -153,6 +184,28 @@ impl eframe::App for SettingsApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
     }
+}
+
+/// App-wide look for this window: rounded widgets and comfortable button
+/// padding, matching the toolbar's style.
+fn install_style(ctx: &egui::Context) {
+    ctx.all_styles_mut(|style| {
+        let v = &mut style.visuals;
+        for w in [
+            &mut v.widgets.inactive,
+            &mut v.widgets.hovered,
+            &mut v.widgets.active,
+            &mut v.widgets.open,
+            &mut v.widgets.noninteractive,
+        ] {
+            w.corner_radius = CornerRadius::same(7);
+        }
+        style.spacing.button_padding = Vec2::new(14.0, 8.0);
+        style.spacing.item_spacing = Vec2::new(8.0, 8.0);
+        if let Some(f) = style.text_styles.get_mut(&TextStyle::Button) {
+            f.size = 15.0;
+        }
+    });
 }
 
 /// Map an egui [`Key`] to a token our [`Combo`] parser accepts. Uses the
@@ -184,84 +237,32 @@ fn key_token(key: Key) -> Option<String> {
     }
 }
 
-/// Draw the combo as a centered row of modifier symbols + the key, painting
-/// the modifier glyphs ourselves so they render identically (egui's bundled
-/// fonts have none of ⌃/⌥/⌘, only a stray ⇧).
-fn draw_combo(ui: &mut egui::Ui, combo: &Combo) {
-    let color = ui.visuals().strong_text_color();
-    let stroke = Stroke::new(2.4, color);
-    const BOX: f32 = 40.0;
-
-    ui.horizontal(|ui| {
-        for m in combo.modifiers() {
-            let (rect, _) = ui.allocate_exact_size(Vec2::new(34.0, BOX), Sense::hover());
-            draw_modifier(ui.painter(), rect, m, stroke, color);
-        }
-        let (rect, _) = ui.allocate_exact_size(Vec2::new(30.0, BOX), Sense::hover());
-        ui.painter().text(
-            rect.center(),
-            Align2::CENTER_CENTER,
-            combo.key_display(),
-            FontId::proportional(27.0),
-            color,
-        );
-    });
+/// The combo text, large and centered. Uses the default proportional family —
+/// on macOS the system font is appended to it as a fallback (see
+/// [`install_system_font`]), so ⌘/⇧/⌃/⌥ resolve to the real system glyphs;
+/// elsewhere the label is plain text anyway.
+fn combo_text(text: String) -> RichText {
+    RichText::new(text).size(30.0).strong()
 }
 
-/// Paint one modifier symbol centered in `rect`.
-fn draw_modifier(painter: &egui::Painter, rect: Rect, m: Modifier, stroke: Stroke, fill: Color32) {
-    let c = rect.center();
-    match m {
-        // ⌘ — four corner loops joined into a square.
-        Modifier::Meta => {
-            let o = 6.5;
-            let corners = [
-                c + Vec2::new(-o, -o),
-                c + Vec2::new(o, -o),
-                c + Vec2::new(o, o),
-                c + Vec2::new(-o, o),
-            ];
-            for p in corners {
-                painter.circle_stroke(p, 3.6, stroke);
-            }
-            for i in 0..4 {
-                painter.line_segment([corners[i], corners[(i + 1) % 4]], stroke);
-            }
+/// On macOS, append the system font (San Francisco) as a last-resort fallback
+/// to the default families, so the modifier glyphs the bundled fonts lack
+/// (⌘/⌃/⌥) render natively. Appending (not a named family) means the family is
+/// always bound — text never panics even before the fonts take effect.
+fn install_system_font(ctx: &egui::Context) {
+    #[cfg(target_os = "macos")]
+    {
+        use eframe::egui::{FontData, FontDefinitions, FontFamily};
+        let Ok(bytes) = std::fs::read("/System/Library/Fonts/SFNS.ttf") else { return };
+        let mut fonts = FontDefinitions::default();
+        fonts
+            .font_data
+            .insert("system".to_owned(), std::sync::Arc::new(FontData::from_owned(bytes)));
+        for family in [FontFamily::Proportional, FontFamily::Monospace] {
+            fonts.families.entry(family).or_default().push("system".to_owned());
         }
-        // ⇧ — filled up-arrow.
-        Modifier::Shift => {
-            let top = rect.top() + 9.0;
-            let mid = c.y + 1.0;
-            let bot = rect.bottom() - 9.0;
-            let (tw, sw) = (9.0, 4.0);
-            let tri = vec![
-                Pos2::new(c.x, top),
-                Pos2::new(c.x - tw, mid),
-                Pos2::new(c.x + tw, mid),
-            ];
-            painter.add(Shape::convex_polygon(tri, fill, Stroke::NONE));
-            painter.rect_filled(
-                Rect::from_min_max(Pos2::new(c.x - sw, mid), Pos2::new(c.x + sw, bot)),
-                0.0,
-                fill,
-            );
-        }
-        // ⌃ — upward chevron.
-        Modifier::Ctrl => {
-            let apex = Pos2::new(c.x, rect.top() + 12.0);
-            let y = c.y + 3.0;
-            painter.line_segment([apex, Pos2::new(c.x - 8.5, y)], stroke);
-            painter.line_segment([apex, Pos2::new(c.x + 8.5, y)], stroke);
-        }
-        // ⌥ — option: a diagonal into the top-right bar, plus a top-left dash.
-        Modifier::Alt => {
-            let ytop = rect.top() + 12.0;
-            let ybot = rect.bottom() - 12.0;
-            let xl = rect.left() + 7.0;
-            let xr = rect.right() - 7.0;
-            painter.line_segment([Pos2::new(xl, ybot), Pos2::new(c.x, ytop)], stroke);
-            painter.line_segment([Pos2::new(c.x, ytop), Pos2::new(xr, ytop)], stroke);
-            painter.line_segment([Pos2::new(xl, ytop), Pos2::new(xl + 6.5, ytop)], stroke);
-        }
+        ctx.set_fonts(fonts);
     }
+    #[cfg(not(target_os = "macos"))]
+    let _ = ctx;
 }

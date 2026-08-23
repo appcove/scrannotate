@@ -168,17 +168,10 @@ fn main() -> Result<()> {
         // Resident tray/menubar launcher. Blocks until quit. The hotkey comes
         // from prefs (set in the Settings window), falling back to --combo.
         if cli.tray || bare_launch {
-            let saved_prefs = prefs::load();
-            // The very first launch also fires one capture so the app shows
-            // what it does; every later launch just sits in the tray.
-            let first_run = !saved_prefs.launched;
-            if first_run {
-                prefs::mark_launched();
-            }
-            let saved = saved_prefs.hotkey.clone().unwrap_or_else(|| cli.combo.clone());
+            let saved = prefs::load().hotkey.unwrap_or_else(|| cli.combo.clone());
             let combo = hotkey::Combo::parse(&saved)
                 .or_else(|_| hotkey::Combo::parse(tray::DEFAULT_COMBO))?;
-            return tray::run(combo, cli.screen, first_run);
+            return tray::run(combo, cli.screen);
         }
     }
     #[cfg(not(any(target_os = "macos", windows)))]

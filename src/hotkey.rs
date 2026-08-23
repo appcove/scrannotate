@@ -143,16 +143,6 @@ impl Combo {
     }
 }
 
-/// A keyboard modifier, for the settings window's drawn symbols.
-#[cfg(any(target_os = "macos", windows))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Modifier {
-    Ctrl,
-    Alt,
-    Shift,
-    Meta,
-}
-
 // Helpers for the resident tray (tray.rs), which needs the combo in
 // global-hotkey's parser format and a human label for the menu.
 #[cfg(any(target_os = "macos", windows))]
@@ -176,31 +166,6 @@ impl Combo {
         // digits pass through uppercased (KeyS accepts "S", Digit4 accepts "4").
         parts.push(if self.key == "Print" { "PRINTSCREEN".into() } else { self.key.to_uppercase() });
         parts.join("+")
-    }
-
-    /// The active modifiers in display order (macOS: ⌃⌥⇧⌘). Used by the
-    /// settings window, which draws them as shapes because egui's bundled
-    /// fonts lack ⌃/⌥/⌘ entirely.
-    pub fn modifiers(&self) -> Vec<Modifier> {
-        let mut mods = Vec::new();
-        if self.ctrl {
-            mods.push(Modifier::Ctrl);
-        }
-        if self.alt {
-            mods.push(Modifier::Alt);
-        }
-        if self.shift {
-            mods.push(Modifier::Shift);
-        }
-        if self.meta {
-            mods.push(Modifier::Meta);
-        }
-        mods
-    }
-
-    /// The non-modifier key, shown uppercased (e.g. `S`, `4`, `F5`).
-    pub fn key_display(&self) -> String {
-        self.key.to_uppercase()
     }
 
     /// A compact label for the tray menu (glyphs on macOS, text on Windows).

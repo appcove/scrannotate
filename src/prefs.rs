@@ -39,9 +39,6 @@ pub struct Prefs {
     pub font_size: Option<f32>,
     /// The tray's launch hotkey, e.g. `Cmd+Shift+4` (set in Settings).
     pub hotkey: Option<String>,
-    /// Set once the app has run at least once, so the first launch can capture
-    /// immediately (show what it does) while later launches just sit in the tray.
-    pub launched: bool,
 }
 
 fn parse_color(hex: &str) -> Option<Color32> {
@@ -84,7 +81,6 @@ pub fn load() -> Prefs {
                     prefs.hotkey = Some(v.to_string());
                 }
             }
-            "launched" => prefs.launched = value.trim() == "1",
             _ => {}
         }
     }
@@ -112,9 +108,6 @@ fn write_all(prefs: &Prefs) {
     }
     if let Some(hotkey) = &prefs.hotkey {
         contents.push_str(&format!("hotkey={hotkey}\n"));
-    }
-    if prefs.launched {
-        contents.push_str("launched=1\n");
     }
     if let Err(err) = std::fs::write(&path, contents) {
         eprintln!("warning: could not persist preferences: {err}");
@@ -148,17 +141,6 @@ pub fn save_hotkey(combo: &str) {
     let mut prefs = load();
     prefs.hotkey = Some(combo.to_string());
     write_all(&prefs);
-}
-
-/// Record that the app has now run once (so later launches skip the
-/// first-run capture). No-op if already set.
-#[cfg(any(target_os = "macos", windows))]
-pub fn mark_launched() {
-    let mut prefs = load();
-    if !prefs.launched {
-        prefs.launched = true;
-        write_all(&prefs);
-    }
 }
 
 #[cfg(test)]

@@ -58,10 +58,9 @@ enum UserEvent {
 }
 
 /// Launch the resident tray. Blocks until the user quits it. The initial
-/// hotkey comes from `combo` (which the caller sources from prefs). When
-/// `first_run` is set, an initial capture fires right away so the very first
-/// launch shows what the app does instead of sitting silently in the tray.
-pub fn run(combo: Combo, screen: u32, first_run: bool) -> Result<()> {
+/// hotkey comes from `combo` (which the caller sources from prefs). A capture
+/// opens immediately on launch; the tray then stays resident.
+pub fn run(combo: Combo, screen: u32) -> Result<()> {
     let hotkey = parse_hotkey(&combo)?;
 
     let event_loop = {
@@ -83,7 +82,6 @@ pub fn run(combo: Combo, screen: u32, first_run: bool) -> Result<()> {
         screen,
         hotkey,
         combo_label: combo.label(),
-        first_run,
         proxy,
         started: false,
         flash_until: None,
@@ -108,7 +106,6 @@ struct App {
     screen: u32,
     hotkey: HotKey,
     combo_label: String,
-    first_run: bool,
     proxy: EventLoopProxy<UserEvent>,
     started: bool,
     /// While set, the menubar title shows the hotkey; cleared once elapsed.
@@ -183,13 +180,12 @@ impl App {
         self.capture_item = Some(capture);
         self.tray = Some(tray);
 
-        // Flash the hotkey so a freshly-opened tray reminds the user how to
-        // capture. On first-ever launch, also fire one capture right away so
-        // they see what the app does; it drops back to the tray when done.
+        // Every launch from a quit state opens a capture right away (so the
+        // app is immediately useful), then stays resident in the tray — the
+        // capture is a separate process, so closing it leaves the tray running.
+        // The hotkey is flashed too, as a reminder for subsequent captures.
         self.flash_hotkey();
-        if self.first_run {
-            self.spawn_capture();
-        }
+        self.spawn_capture();
         Ok(())
     }
 
