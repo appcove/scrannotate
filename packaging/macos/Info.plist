@@ -14,6 +14,8 @@
     <string>com.appcove.scrannotate</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
     <key>CFBundleName</key>
     <string>scrannotate</string>
     <key>CFBundlePackageType</key>
