@@ -44,6 +44,86 @@ pub fn run() -> Result<()> {
     .map_err(|e| anyhow!("running settings window: {e}"))
 }
 
+/// Flash the current hotkey in a small, borderless, always-on-top window
+/// centered on screen, then close after a few seconds. The tray shows this on
+/// launch as a reminder. Reuses this module's font + style so the glyphs match.
+pub fn run_flash() -> Result<()> {
+    let combo = prefs::load().hotkey.unwrap_or_else(|| "Ctrl+Shift+S".to_string());
+    let options = eframe::NativeOptions {
+        viewport: ViewportBuilder::default()
+            .with_title("scrannotate")
+            .with_inner_size([320.0, 132.0])
+            .with_decorations(false)
+            .with_always_on_top()
+            .with_resizable(false)
+            .with_taskbar(false),
+        ..Default::default()
+    };
+    eframe::run_native(
+        "scrannotate flash",
+        options,
+        Box::new(move |cc| {
+            install_system_font(&cc.egui_ctx);
+            install_style(&cc.egui_ctx);
+            Ok(Box::new(FlashApp::new(combo)))
+        }),
+    )
+    .map_err(|e| anyhow!("running flash window: {e}"))
+}
+
+struct FlashApp {
+    label: String,
+    deadline: std::time::Instant,
+    centered: bool,
+}
+
+impl FlashApp {
+    fn new(combo: String) -> Self {
+        let label = Combo::parse(&combo).map(|c| c.label()).unwrap_or(combo);
+        Self { label, deadline: std::time::Instant::now() + std::time::Duration::from_secs(3), centered: false }
+    }
+}
+
+impl eframe::App for FlashApp {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        // Opaque dark card.
+        [0.09, 0.09, 0.10, 1.0]
+    }
+
+    fn ui(&mut self, root: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = root.ctx().clone();
+
+        // Center on the monitor once the geometry is known.
+        if !self.centered {
+            let mon = ctx.input(|i| i.viewport().monitor_size);
+            let outer = ctx.input(|i| i.viewport().outer_rect);
+            if let (Some(mon), Some(outer)) = (mon, outer) {
+                let size = outer.size();
+                ctx.send_viewport_cmd(ViewportCommand::OuterPosition(egui::Pos2::new(
+                    ((mon.x - size.x) / 2.0).max(0.0),
+                    ((mon.y - size.y) / 2.0).max(0.0),
+                )));
+                self.centered = true;
+            }
+        }
+
+        if std::time::Instant::now() >= self.deadline {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+
+        egui::Frame::default()
+            .inner_margin(Margin::symmetric(20, 18))
+            .show(root, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.label(RichText::new("Press to capture").weak().size(14.0));
+                    ui.add_space(10.0);
+                    ui.label(combo_text(self.label.clone()));
+                });
+            });
+    }
+}
+
 struct SettingsApp {
     /// The combo string being edited (e.g. `Cmd+Shift+4`).
     combo: String,

@@ -80,12 +80,18 @@ struct Cli {
     /// "Set hotkey…" item), then exit.
     #[arg(long)]
     settings: bool,
+
+    /// macOS/Windows: flash the current hotkey in a centered window for a few
+    /// seconds, then exit (the tray shows this on launch). Internal.
+    #[arg(long, hide = true)]
+    flash: bool,
 }
 
 fn default_output_dir() -> PathBuf {
     match std::env::home_dir() {
-        Some(home) if home.join("Pictures").is_dir() => home.join("Pictures/Screenshots"),
-        Some(home) => home.join("Screenshots"),
+        // The Desktop, like macOS's own screenshots. Falls back to home.
+        Some(home) if home.join("Desktop").is_dir() => home.join("Desktop"),
+        Some(home) => home,
         None => PathBuf::from("."),
     }
 }
@@ -164,6 +170,9 @@ fn main() -> Result<()> {
     {
         if cli.settings {
             return settings::run();
+        }
+        if cli.flash {
+            return settings::run_flash();
         }
         // Resident tray/menubar launcher. Blocks until quit. The hotkey comes
         // from prefs (set in the Settings window), falling back to --combo.

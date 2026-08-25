@@ -20,9 +20,6 @@
 //! is reminded how to capture without having to hunt through the menu.
 
 use std::process::Command;
-use std::time::Instant;
-#[cfg(target_os = "macos")]
-use std::time::Duration;
 
 use anyhow::{Context, Result};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
@@ -43,9 +40,6 @@ use crate::prefs;
 /// Fallback when the user has never set a hotkey.
 pub const DEFAULT_COMBO: &str = "Ctrl+Shift+S";
 
-/// How long the hotkey stays flashed beside the menubar icon.
-#[cfg(target_os = "macos")]
-const FLASH: Duration = Duration::from_secs(4);
 
 /// Loop wake-ups posted from the hotkey/menu OS callbacks.
 #[derive(Debug)]
@@ -84,7 +78,6 @@ pub fn run(combo: Combo, screen: u32) -> Result<()> {
         combo_label: combo.label(),
         proxy,
         started: false,
-        flash_until: None,
         tray: None,
         hotkey_manager: None,
         capture_item: None,
@@ -108,8 +101,6 @@ struct App {
     combo_label: String,
     proxy: EventLoopProxy<UserEvent>,
     started: bool,
-    /// While set, the menubar title shows the hotkey; cleared once elapsed.
-    flash_until: Option<Instant>,
     // Kept alive for the process's lifetime: dropping the manager unregisters
     // the hotkey, dropping the tray removes the icon. The capture item is held
     // so its label can be refreshed when the hotkey changes.
@@ -181,33 +172,18 @@ impl App {
         self.tray = Some(tray);
 
         // Every launch from a quit state opens a capture right away (so the
-        // app is immediately useful), then stays resident in the tray — the
-        // capture is a separate process, so closing it leaves the tray running.
-        // The hotkey is flashed too, as a reminder for subsequent captures.
-        self.flash_hotkey();
+        // app is immediately useful) and flashes the hotkey in a centered
+        // window, then stays resident in the tray. Both are separate
+        // processes, so closing them leaves the tray running.
         self.spawn_capture();
+        self.spawn_flash();
         Ok(())
     }
 
-    /// Briefly show the hotkey beside the menubar icon (macOS). `about_to_wait`
-    /// clears it once [`FLASH`] elapses. The taskbar tray has no title text, so
-    /// on Windows the always-present tooltip carries the hotkey instead.
-    fn flash_hotkey(&mut self) {
-        #[cfg(target_os = "macos")]
-        {
-            if let Some(tray) = &self.tray {
-                tray.set_title(Some(format!(" {}", self.combo_label)));
-            }
-            self.flash_until = Some(Instant::now() + FLASH);
-        }
-    }
-
-    fn clear_flash(&mut self) {
-        self.flash_until = None;
-        #[cfg(target_os = "macos")]
-        if let Some(tray) = &self.tray {
-            tray.set_title(None::<&str>);
-        }
+    /// Show the centered hotkey-reminder window (`--flash`). Launch-only, so the
+    /// user sees the shortcut once per fresh start, not on every capture.
+    fn spawn_flash(&self) {
+        self.spawn(&["--flash"]);
     }
 
     fn capture_label(&self) -> String {
@@ -263,8 +239,6 @@ impl App {
         if let Some(tray) = &self.tray {
             let _ = tray.set_tooltip(Some(self.tooltip()));
         }
-        // Show the new hotkey so the change is visible.
-        self.flash_hotkey();
     }
 
     fn spawn(&self, args: &[&str]) {
@@ -304,19 +278,6 @@ impl ApplicationHandler<UserEvent> for App {
 
     // The supervisor owns no windows; nothing to handle.
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
-
-    // Idle otherwise (ControlFlow::Wait); while the hotkey is flashed, wake at
-    // its deadline to clear it.
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        match self.flash_until {
-            Some(deadline) if Instant::now() >= deadline => {
-                self.clear_flash();
-                event_loop.set_control_flow(ControlFlow::Wait);
-            }
-            Some(deadline) => event_loop.set_control_flow(ControlFlow::WaitUntil(deadline)),
-            None => {}
-        }
-    }
 }
 
 /// A simple "S" on a transparent background, rasterized at runtime from the

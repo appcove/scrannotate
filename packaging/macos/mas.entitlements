@@ -4,11 +4,16 @@
   Mac App Store entitlements. The App Sandbox is mandatory for MAS.
 
   - app-sandbox:            required by the Mac App Store.
-  - assets.pictures.rw:     scrannotate saves PNGs to ~/Pictures/Screenshots
-                            without a save dialog; the sandbox blocks that
-                            unless we hold the Pictures-folder entitlement.
-                            (If review rejects this, switch Ctrl+S to an
-                            NSSavePanel and use files.user-selected instead.)
+  - temporary-exception, home-relative /Desktop/: scrannotate saves PNGs to
+                            ~/Desktop without a save dialog; the sandbox
+                            otherwise redirects ~/Desktop into the app's
+                            container. There is no dedicated Desktop-folder
+                            entitlement, so a home-relative temporary exception
+                            is the way to reach the real Desktop.
+                            NOTE FOR APP STORE REVIEW: temporary exceptions can
+                            draw scrutiny. If rejected, switch Ctrl+S to an
+                            NSSavePanel + a security-scoped bookmark and use
+                            com.apple.security.files.user-selected.read-write.
   Screen Recording itself needs NO entitlement — ScreenCaptureKit is gated at
   runtime by TCC (the user grant), which works inside the sandbox. No network
   entitlement: scrannotate never touches the network.
@@ -17,7 +22,9 @@
 <dict>
     <key>com.apple.security.app-sandbox</key>
     <true/>
-    <key>com.apple.security.assets.pictures.read-write</key>
-    <true/>
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array>
+        <string>/Desktop/</string>
+    </array>
 </dict>
 </plist>
