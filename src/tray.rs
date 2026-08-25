@@ -172,16 +172,17 @@ impl App {
         self.tray = Some(tray);
 
         // Every launch from a quit state opens a capture right away (so the
-        // app is immediately useful) and flashes the hotkey in a centered
-        // window, then stays resident in the tray. Both are separate
-        // processes, so closing them leaves the tray running.
+        // app is immediately useful), then stays resident in the tray. The
+        // capture is a separate process, so closing it leaves the tray running.
         self.spawn_capture();
-        self.spawn_flash();
+        // Hotkey-reminder flash disabled for now (kept for later).
+        // self.spawn_flash();
         Ok(())
     }
 
     /// Show the centered hotkey-reminder window (`--flash`). Launch-only, so the
     /// user sees the shortcut once per fresh start, not on every capture.
+    #[allow(dead_code)]
     fn spawn_flash(&self) {
         self.spawn(&["--flash"]);
     }
@@ -280,37 +281,53 @@ impl ApplicationHandler<UserEvent> for App {
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
 }
 
-/// A simple "S" on a transparent background, rasterized at runtime from the
-/// embedded font — so the tray needs no image asset. On macOS it's drawn black
-/// and flagged as a template (see `with_icon_as_template`), letting the system
-/// tint it for the light/dark menubar; elsewhere it's drawn white for the
-/// typically-dark taskbar tray.
+/// An "S" inside a ring — the logo, rasterized at runtime from the embedded
+/// font so the tray needs no image asset. On macOS it's drawn black and flagged
+/// as a template (see `with_icon_as_template`), letting the system tint it for
+/// the light/dark menubar; elsewhere it's drawn white for the typically-dark
+/// taskbar tray.
 fn tray_icon() -> Icon {
     use ab_glyph::{Font, FontRef, PxScale};
 
     const N: u32 = 36;
-    let mut rgba = vec![0u8; (N * N * 4) as usize]; // transparent
-    let [r, g, b] = if cfg!(target_os = "macos") { [0u8, 0, 0] } else { [255u8, 255, 255] };
+    // Single coverage (alpha) buffer; the ring and the glyph both write into it.
+    let mut alpha = vec![0.0f32; (N * N) as usize];
+    let put = |alpha: &mut [f32], x: i32, y: i32, a: f32| {
+        if x >= 0 && y >= 0 && (x as u32) < N && (y as u32) < N && a > 0.0 {
+            let i = (y as u32 * N + x as u32) as usize;
+            alpha[i] = alpha[i].max(a);
+        }
+    };
 
+    // The ring.
+    let c = (N as f32 - 1.0) / 2.0;
+    let radius = N as f32 / 2.0 - 2.0;
+    let half_thick = 1.4;
+    for y in 0..N as i32 {
+        for x in 0..N as i32 {
+            let d = ((x as f32 - c).powi(2) + (y as f32 - c).powi(2)).sqrt();
+            let cov = (half_thick + 0.5 - (d - radius).abs()).clamp(0.0, 1.0);
+            put(&mut alpha, x, y, cov);
+        }
+    }
+
+    // The "S", scaled to sit inside the ring.
     if let Ok(font) = FontRef::try_from_slice(epaint_default_fonts::HACK_REGULAR) {
-        let glyph = font.glyph_id('S').with_scale(PxScale::from(N as f32 * 1.05));
+        let glyph = font.glyph_id('S').with_scale(PxScale::from(N as f32 * 0.66));
         if let Some(outlined) = font.outline_glyph(glyph) {
             let bounds = outlined.px_bounds();
-            // Center the glyph's ink box in the square canvas.
             let off_x = ((N as f32 - bounds.width()) / 2.0).round() as i32;
             let off_y = ((N as f32 - bounds.height()) / 2.0).round() as i32;
             outlined.draw(|x, y, coverage| {
-                let px = off_x + x as i32;
-                let py = off_y + y as i32;
-                if px >= 0 && py >= 0 && (px as u32) < N && (py as u32) < N {
-                    let idx = ((py as u32 * N + px as u32) * 4) as usize;
-                    rgba[idx] = r;
-                    rgba[idx + 1] = g;
-                    rgba[idx + 2] = b;
-                    rgba[idx + 3] = (coverage * 255.0) as u8;
-                }
+                put(&mut alpha, off_x + x as i32, off_y + y as i32, coverage);
             });
         }
+    }
+
+    let [r, g, b] = if cfg!(target_os = "macos") { [0u8, 0, 0] } else { [255u8, 255, 255] };
+    let mut rgba = Vec::with_capacity((N * N * 4) as usize);
+    for a in alpha {
+        rgba.extend_from_slice(&[r, g, b, (a * 255.0) as u8]);
     }
     Icon::from_rgba(rgba, N, N).expect("valid tray icon")
 }

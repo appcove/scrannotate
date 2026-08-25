@@ -117,48 +117,43 @@ impl Editor {
         let hint = |s: &str| (StatusKind::Hint, s.to_owned());
         match &self.state {
             EditorState::ConfirmDiscard { .. } => {
-                (StatusKind::Alert, "Press Esc again to close and discard".to_owned())
+                (StatusKind::Alert, "Press Esc again to discard and close".to_owned())
             }
             EditorState::TextEditing(_) => {
-                hint("Type · Enter: done · Shift+Enter: new line · Ctrl+C: copy & close · Esc: cancel")
+                hint("Type your text.  Enter to finish · Shift+Enter for a new line · Esc to cancel")
             }
-            EditorState::DrawingShape { .. } => hint("Release to place · Esc: cancel"),
-            EditorState::RegionDraw { .. } => hint("Release to set the region · Esc: cancel"),
-            EditorState::RegionAdjust { .. } => hint("Release to keep · Esc: put it back"),
-            EditorState::ItemsDrag { .. } => hint("Release to keep · Esc: put it back"),
+            EditorState::DrawingShape { .. } => hint("Release to place it · Esc to cancel"),
+            EditorState::RegionDraw { .. } => hint("Release to set the area · Esc to cancel"),
+            EditorState::RegionAdjust { .. } => hint("Release to keep · Esc to undo"),
+            EditorState::ItemsDrag { .. } => hint("Release to keep · Esc to undo"),
             EditorState::RubberBand { .. } => hint("Release to select what's inside"),
-            EditorState::Panning => hint("Panning — release to stop"),
+            EditorState::Panning => hint("Panning… release to stop"),
             EditorState::Idle => {
                 if self.doc.region.is_none() {
-                    return hint(
-                        "Drag out a region · Enter: copy whole screen · scroll: zoom · Esc Esc: discard",
-                    );
+                    return hint("Drag to select an area · Enter to copy the whole screen");
                 }
                 match self.tool {
                     Tool::Select if !self.selected.is_empty() => (
                         StatusKind::Hint,
                         format!(
-                            "{} selected · drag: move · Shift+drag: add · Del: delete · Esc: deselect",
+                            "{} selected · Drag to move · Del to delete · Esc to deselect",
                             self.selected.len()
                         ),
                     ),
-                    Tool::Select => hint(
-                        "Drag a box to select · Shift+drag: add · click an item · right-drag: new region · Esc Esc: discard",
-                    ),
-                    Tool::Text => hint("Click to place text · click existing text to edit it"),
+                    Tool::Select => {
+                        hint("Click an item to select it · Drag to select several · Right-drag for a new area")
+                    }
+                    Tool::Text => hint("Click to add text · Click existing text to edit it"),
                     Tool::Marker => (
                         StatusKind::Hint,
                         format!(
-                            "Click to drop marker {} · drag to pull an arrow out of it",
+                            "Click to drop marker {} · Drag it to pull out an arrow",
                             self.doc.marker_next
                         ),
                     ),
                     tool => (
                         StatusKind::Hint,
-                        format!(
-                            "Drag to draw a {} · tap Space for Select · right-drag: new region",
-                            tool.label()
-                        ),
+                        format!("Drag to draw a {} · Press Space to select", tool.label()),
                     ),
                 }
             }

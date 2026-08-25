@@ -43,6 +43,32 @@ pub struct Style {
     pub font_size: f32,
 }
 
+/// How much to thicken text, in image pixels, for a given stroke `width`. Text
+/// has no stroke, so the Width control doubles as a boldness control: low
+/// widths render normal weight, higher widths bolder. Both renderers (egui and
+/// tiny-skia) thicken by stamping the text over [`bold_offsets`], so on-screen
+/// and export stay in step.
+pub fn text_bold(width: f32) -> f32 {
+    (width - 1.0).max(0.0) * 0.16
+}
+
+/// Offsets (image pixels) over which to stamp text to fake `bold` weight:
+/// the origin plus two rings, so the thickening is even. Just the origin when
+/// there's no bold to add.
+pub fn bold_offsets(bold: f32) -> Vec<(f32, f32)> {
+    if bold <= 0.05 {
+        return vec![(0.0, 0.0)];
+    }
+    let mut offsets = vec![(0.0, 0.0)];
+    for ring in [bold, bold * 0.5] {
+        for i in 0..8 {
+            let a = std::f32::consts::TAU * i as f32 / 8.0;
+            offsets.push((a.cos() * ring, a.sin() * ring));
+        }
+    }
+    offsets
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Shape {
     Pen { points: Vec<Pos2> },

@@ -152,9 +152,18 @@ fn draw_annotation(pixmap: &mut Pixmap, font: &FontRef<'_>, ann: &Annotation) {
         Shape::Pixelate { .. } => {}
         Shape::Text { pos, text } => {
             if ann.rotation == 0.0 {
-                draw_text(pixmap, font, *pos, text, style.font_size, style.color);
+                draw_text(pixmap, font, *pos, text, style.font_size, style.width, style.color);
             } else {
-                draw_text_rotated(pixmap, font, *pos, text, style.font_size, style.color, ann.rotation);
+                draw_text_rotated(
+                    pixmap,
+                    font,
+                    *pos,
+                    text,
+                    style.font_size,
+                    style.width,
+                    style.color,
+                    ann.rotation,
+                );
             }
         }
         Shape::Marker { pos, number, target } => {
@@ -219,14 +228,27 @@ fn draw_text(
     pos: Pos2,
     text: &str,
     size: f32,
+    width: f32,
     color: Color32,
 ) {
     let scale = px_scale(font, size);
     let scaled = font.as_scaled(scale);
     let line_height = scaled.height() + scaled.line_gap();
+    // Fake bold: stamp each line over the bold offsets (matches the on-screen
+    // renderer in ui/paint.rs).
+    let offsets = crate::annotate::bold_offsets(crate::annotate::text_bold(width));
     let mut baseline = pos.y + scaled.ascent();
     for line in text.split('\n') {
-        draw_text_line(pixmap, font, Pos2::new(pos.x, baseline), line, scale, color);
+        for (ox, oy) in &offsets {
+            draw_text_line(
+                pixmap,
+                font,
+                Pos2::new(pos.x + ox, baseline + oy),
+                line,
+                scale,
+                color,
+            );
+        }
         baseline += line_height;
     }
 }
@@ -247,12 +269,14 @@ fn text_block_size(font: &FontRef<'_>, text: &str, size: f32) -> (f32, f32) {
 
 /// ab_glyph can't rasterize at an angle, so rotated text renders into a
 /// transparent scratch pixmap that gets blitted with a rotate transform.
+#[allow(clippy::too_many_arguments)]
 fn draw_text_rotated(
     pixmap: &mut Pixmap,
     font: &FontRef<'_>,
     pos: Pos2,
     text: &str,
     size: f32,
+    width: f32,
     color: Color32,
     rotation: f32,
 ) {
@@ -263,10 +287,10 @@ fn draw_text_rotated(
     let tw = clamp_px((w + pad * 2.0).ceil(), 1 << 14).max(1);
     let th = clamp_px((h + pad * 2.0).ceil(), 1 << 14).max(1);
     let Some(mut temp) = Pixmap::new(tw, th) else {
-        draw_text(pixmap, font, pos, text, size, color);
+        draw_text(pixmap, font, pos, text, size, width, color);
         return;
     };
-    draw_text(&mut temp, font, Pos2::new(pad, pad), text, size, color);
+    draw_text(&mut temp, font, Pos2::new(pad, pad), text, size, width, color);
     let center = Pos2::new(pos.x + w * 0.5, pos.y + h * 0.5);
     let paint = PixmapPaint { quality: FilterQuality::Bilinear, ..PixmapPaint::default() };
     pixmap.draw_pixmap(

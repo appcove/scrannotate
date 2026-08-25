@@ -12,6 +12,16 @@ use crate::annotate::Tool;
 use crate::editor::{Editor, StatusKind};
 use crate::ui::{ACCENT, ACTIVE_TOOL_FILL, TOOLS, color_picker};
 
+/// The chord key as the user sees it: ⌘ on macOS, Ctrl elsewhere. (The actual
+/// binding accepts the platform key either way — this is only the label.)
+#[cfg(target_os = "macos")]
+const MOD: &str = "Cmd";
+#[cfg(not(target_os = "macos"))]
+const MOD: &str = "Ctrl";
+
+/// Fill for the destructive Close button (native-macOS-style red).
+const CLOSE_RED: Color32 = Color32::from_rgb(0xd9, 0x3f, 0x3a);
+
 /// Actions the toolbar can't perform itself (they need export/clipboard/
 /// viewport access); the app layer executes them.
 pub enum ToolbarAction {
@@ -228,6 +238,9 @@ impl Toolbar {
                     // the two primary "ship" actions (Copy+Close/Save+Close)
                     // read as the default action rather than equal-weight
                     // siblings of Copy/Save.
+                    // Each button is forced to exactly `half` wide (via
+                    // add_sized) so the two columns line up no matter how long
+                    // the labels are. `accent` fills the primary "ship" action.
                     let pair = |ui: &mut egui::Ui,
                                     a: (&str, bool, bool),
                                     b: (&str, bool, bool)|
@@ -235,13 +248,17 @@ impl Toolbar {
                         let mut clicked = (false, false);
                         ui.horizontal(|ui| {
                             for (i, (label, enabled, accent)) in [a, b].into_iter().enumerate() {
-                                let mut btn = Button::new(label).min_size(Vec2::new(half, 34.0));
+                                let mut btn = Button::new(label);
                                 if accent {
                                     btn = btn.fill(ACCENT);
                                 }
-                                let btn = ui.add_enabled(enabled, btn);
-                                if btn.clicked() {
-                                    btn.surrender_focus();
+                                let resp = ui
+                                    .add_enabled_ui(enabled, |ui| {
+                                        ui.add_sized(Vec2::new(half, 34.0), btn)
+                                    })
+                                    .inner;
+                                if resp.clicked() {
+                                    resp.surrender_focus();
                                     if i == 0 {
                                         clicked.0 = true;
                                     } else {
@@ -254,8 +271,8 @@ impl Toolbar {
                     };
                     let (undo, redo) = pair(
                         ui,
-                        ("Undo  Ctrl+Z", editor.doc.can_undo(), false),
-                        ("Redo  Ctrl+Y", editor.doc.can_redo(), false),
+                        (&format!("Undo  {MOD}+Z"), editor.doc.can_undo(), false),
+                        (&format!("Redo  {MOD}+Y"), editor.doc.can_redo(), false),
                     );
                     if undo {
                         editor.undo();
@@ -272,26 +289,33 @@ impl Toolbar {
                         editor.reset_all();
                     }
                     ui.separator();
-                    let (copy, copy_close) =
-                        pair(ui, ("Copy", true, false), ("Copy+Close  Ctrl+C", true, true));
+                    let (copy, copy_close) = pair(
+                        ui,
+                        ("Copy", true, false),
+                        (&format!("Copy+Close  {MOD}+C"), true, true),
+                    );
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
                     if copy_close {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
-                    let (save, save_close) =
-                        pair(ui, ("Save", true, false), ("Save+Close  Ctrl+S", true, true));
+                    let (save, save_close) = pair(
+                        ui,
+                        ("Save", true, false),
+                        (&format!("Save+Close  {MOD}+S"), true, true),
+                    );
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }
                     if save_close {
                         action = Some(ToolbarAction::Save { close: true });
                     }
-                    if ui
-                        .add(Button::new("Close  Esc").min_size(Vec2::new(0.0, 34.0)))
-                        .clicked()
-                    {
+                    // Full-width, destructive-red Close.
+                    let close = Button::new(RichText::new("Close  Esc").color(Color32::WHITE))
+                        .fill(CLOSE_RED)
+                        .min_size(Vec2::new(ui.available_width(), 36.0));
+                    if ui.add(close).clicked() {
                         action = Some(ToolbarAction::Close);
                     }
                     ui.separator();

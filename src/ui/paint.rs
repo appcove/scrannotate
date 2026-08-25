@@ -8,7 +8,8 @@ use eframe::egui::{
 };
 
 use crate::annotate::{
-    Annotation, Shape, Style, Tool, arrow_geometry, highlight_color, marker_radius,
+    Annotation, Shape, Style, Tool, arrow_geometry, bold_offsets, highlight_color, marker_radius,
+    text_bold,
 };
 use crate::editor::Editor;
 use crate::editor::geometry::{
@@ -89,14 +90,27 @@ pub fn paint_annotation(painter: &egui::Painter, view: &View, canvas: Rect, ann:
         Shape::Text { pos, text } => {
             let font = FontId::proportional(ann.style.font_size * zoom);
             let galley = painter.layout_no_wrap(text.clone(), font, ann.style.color);
+            // Fake bold: stamp the text over a set of offsets (in image pixels,
+            // scaled to screen). Rotated text rotates the offsets with it.
+            let offsets = bold_offsets(text_bold(ann.style.width));
             if rot == 0.0 {
-                painter.galley(to(*pos), galley, ann.style.color);
+                for (ox, oy) in offsets {
+                    painter.galley(
+                        to(*pos) + Vec2::new(ox * zoom, oy * zoom),
+                        galley.clone(),
+                        ann.style.color,
+                    );
+                }
             } else {
                 let c = *pos + (galley.size() / zoom) * 0.5;
-                let mut shape =
-                    TextShape::new(to(rotate_around(*pos, c, rot)), galley, ann.style.color);
-                shape.angle = rot;
-                painter.add(EguiShape::Text(shape));
+                let base = to(rotate_around(*pos, c, rot));
+                let (sin, cos) = rot.sin_cos();
+                for (ox, oy) in offsets {
+                    let off = Vec2::new((ox * cos - oy * sin) * zoom, (ox * sin + oy * cos) * zoom);
+                    let mut shape = TextShape::new(base + off, galley.clone(), ann.style.color);
+                    shape.angle = rot;
+                    painter.add(EguiShape::Text(shape));
+                }
             }
         }
         Shape::Marker { pos, number, target } => {
