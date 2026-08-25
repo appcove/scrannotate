@@ -312,10 +312,19 @@ impl Toolbar {
                         action = Some(ToolbarAction::Save { close: true });
                     }
                     // Full-width, destructive-red Close.
-                    let close = Button::new(RichText::new("Close  Esc").color(Color32::WHITE))
-                        .fill(CLOSE_RED)
-                        .min_size(Vec2::new(ui.available_width(), 36.0));
-                    if ui.add(close).clicked() {
+                    let close = Button::new(
+                        RichText::new("Close  Esc")
+                            .color(Color32::WHITE)
+                            .strong()
+                    )
+                    .fill(CLOSE_RED)
+                    .min_size(Vec2::new(ui.available_width(), 36.0))
+                    ;
+
+                    if ui.add_sized(
+                        [ui.available_width(), 36.0],
+                        close
+                    ).clicked() {
                         action = Some(ToolbarAction::Close);
                     }
                     ui.separator();
