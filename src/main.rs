@@ -7,6 +7,7 @@ mod annotate;
 mod app;
 mod capture;
 mod clipboard;
+mod diag;
 mod document;
 mod editor;
 mod export;
@@ -153,25 +154,50 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    // Pick a role tag for the log, then initialize diagnostics (truncates the
+    // log for a primary launch, appends for a tray-spawned child).
+    let tag = if cli.setup_hotkey {
+        "setup"
+    } else if cli.settings {
+        "settings"
+    } else if cli.from_file.is_some() {
+        "file"
+    } else if cli.tray || bare_launch {
+        "tray"
+    } else {
+        "capture"
+    };
+    diag::init(tag);
+    diag!(
+        "cli: tray={} settings={} setup_hotkey={} from_file={:?} screen={} cursor={} delay={} save_path={:?} bare_launch={}",
+        cli.tray, cli.settings, cli.setup_hotkey, cli.from_file, cli.screen, cli.cursor, cli.delay, cli.save_path, bare_launch,
+    );
+
     // Hotkey setup is a launcher-config action, not a capture: install (or
     // print) the binding for the chosen combination and exit before any
     // screen work happens.
     if cli.setup_hotkey {
+        diag!("mode=setup-hotkey combo={:?} screen={}", cli.combo, cli.screen);
         return hotkey::setup(&cli.combo, cli.screen);
     }
 
     #[cfg(any(target_os = "macos", windows))]
     {
         if cli.settings {
+            diag!("mode=settings — opening hotkey settings window");
             return settings::run();
         }
         // Resident tray/menubar launcher. Blocks until quit. The hotkey comes
         // from prefs (set in the Settings window), falling back to --combo.
         if cli.tray || bare_launch {
             let saved = prefs::load().hotkey.unwrap_or_else(|| cli.combo.clone());
+            diag!("mode=tray — saved hotkey={:?} screen={}", saved, cli.screen);
             let combo = hotkey::Combo::parse(&saved)
                 .or_else(|_| hotkey::Combo::parse(tray::DEFAULT_COMBO))?;
-            return tray::run(combo, cli.screen);
+            diag!("tray: launching resident supervisor…");
+            let r = tray::run(combo, cli.screen);
+            diag!("tray: run() returned {:?}", r.as_ref().map(|_| ()));
+            return r;
         }
     }
     #[cfg(not(any(target_os = "macos", windows)))]
@@ -194,31 +220,50 @@ fn main() -> Result<()> {
     // chooser: screen numbers are deterministic, so show what they mean.
     #[cfg(any(target_os = "macos", windows))]
     if cli.pick_screen && cli.from_file.is_none() && !demo {
+        diag!("mode=pick-screen — listing displays");
         print!("{}", capture::screen_list()?);
         return Ok(());
     }
 
     let (img, display) = match &cli.from_file {
-        Some(path) => (
-            image::open(path)
+        Some(path) => {
+            diag!("loading image from file {:?}", path);
+            let img = image::open(path)
                 .with_context(|| format!("opening {}", path.display()))?
-                .to_rgba8(),
-            None,
-        ),
-        None if demo => (demo_base(), None),
+                .to_rgba8();
+            diag!("loaded file image {}x{}", img.width(), img.height());
+            (img, None)
+        }
+        None if demo => {
+            diag!("demo mode — rendering canned scene");
+            (demo_base(), None)
+        }
         None => {
             if cli.delay > 0 {
+                diag!("delay: sleeping {}s before capture", cli.delay);
                 std::thread::sleep(std::time::Duration::from_secs(cli.delay));
             }
-            let capture::Capture { image, display } = capture::capture(&capture::CaptureOptions {
+            diag!("capture: START screen={} cursor={} pick_screen={}", cli.screen, cli.cursor, cli.pick_screen);
+            let captured = capture::capture(&capture::CaptureOptions {
                 cursor: cli.cursor,
                 pick_screen: cli.pick_screen,
                 screen: cli.screen,
-            })?;
+            });
+            match &captured {
+                Ok(c) => diag!(
+                    "capture: DONE {}x{} display={:?}",
+                    c.image.width(),
+                    c.image.height(),
+                    c.display.as_ref().map(|_| "some")
+                ),
+                Err(e) => diag!("capture: FAILED — {e:#}"),
+            }
+            let capture::Capture { image, display } = captured?;
             (image, display)
         }
     };
     let out_dir = cli.save_path.unwrap_or_else(default_output_dir);
+    diag!("output dir = {:?}", out_dir);
 
     // Everything happens in one fullscreen frozen-frame view. Fresh captures
     // start with no region (drag one out; Enter still copies the whole
@@ -256,12 +301,16 @@ fn main() -> Result<()> {
             builder.with_default_menu(false);
         }));
     }
-    eframe::run_native(
+    diag!("editor: starting eframe window (select_full={select_full}, demo={demo})");
+    let result = eframe::run_native(
         "scrannotate",
         options,
         Box::new(move |_cc| {
+            diag!("editor: creating ScreencapApp");
             Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, demo_mode, display)))
         }),
-    )
+    );
+    diag!("editor: eframe returned {:?}", result.as_ref().map(|_| ()).map_err(|e| e.to_string()));
+    result
     .map_err(|err| anyhow!("running ui: {err}"))
 }

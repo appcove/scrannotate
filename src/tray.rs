@@ -61,7 +61,9 @@ enum UserEvent {
 /// hotkey comes from `combo` (which the caller sources from prefs). A capture
 /// opens immediately on launch; the tray then stays resident.
 pub fn run(combo: Combo, screen: u32) -> Result<()> {
+    crate::diag!("tray::run START — combo={:?} screen={}", combo.accelerator(), screen);
     let hotkey = parse_hotkey(&combo)?;
+    crate::diag!("tray: parsed hotkey ok; building event loop");
 
     let event_loop = {
         let builder = EventLoop::<UserEvent>::with_user_event();
@@ -91,7 +93,9 @@ pub fn run(combo: Combo, screen: u32) -> Result<()> {
         settings_id: None,
         quit_id: None,
     };
+    crate::diag!("tray: entering event loop (run_app)");
     event_loop.run_app(&mut app).context("running the tray event loop")?;
+    crate::diag!("tray::run END — event loop exited");
     Ok(())
 }
 
@@ -124,10 +128,13 @@ impl App {
     /// One-time setup, done once the event loop is live (required on macOS
     /// before a tray icon or Carbon hotkey can be created).
     fn start(&mut self) -> Result<()> {
+        crate::diag!("tray.start: creating global hotkey manager");
         let manager = GlobalHotKeyManager::new().context("initializing the global hotkey")?;
+        crate::diag!("tray.start: registering hotkey {}", self.combo_label);
         manager
             .register(self.hotkey)
             .with_context(|| format!("registering hotkey {}", self.combo_label))?;
+        crate::diag!("tray.start: hotkey registered; building menu");
 
         let menu = Menu::new();
         let capture =
@@ -149,7 +156,9 @@ impl App {
         // macOS tints template icons to match the menubar (light/dark).
         #[cfg(target_os = "macos")]
         let builder = builder.with_icon_as_template(true);
+        crate::diag!("tray.start: building tray icon");
         let tray = builder.build().context("creating the tray icon")?;
+        crate::diag!("tray.start: tray icon added to menubar");
 
         // Forward OS-thread hotkey/menu events into the winit loop so it wakes
         // immediately. These replace the crates' default channels.
@@ -179,6 +188,7 @@ impl App {
         self.hotkey_manager = Some(manager);
         self.capture_item = Some(capture);
         self.tray = Some(tray);
+        crate::diag!("tray.start: setup complete; spawning initial capture");
 
         // Every launch from a quit state opens a capture right away (so the
         // app is immediately useful), then stays resident in the tray — the
@@ -232,8 +242,10 @@ impl App {
             return;
         };
         let proxy = self.proxy.clone();
+        crate::diag!("tray: opening settings window");
         std::thread::spawn(move || {
-            let _ = Command::new(exe).arg("--settings").status();
+            let _ = Command::new(exe).arg("--settings").env(crate::diag::CHILD_ENV, "1").status();
+            crate::diag!("tray: settings window closed; reloading hotkey");
             let _ = proxy.send_event(UserEvent::ReloadHotkey);
         });
     }
@@ -271,12 +283,14 @@ impl App {
         let exe = match std::env::current_exe() {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("scrannotate: cannot find own executable: {e}");
+                crate::diag!("tray: cannot find own executable: {e}");
                 return;
             }
         };
-        if let Err(e) = Command::new(exe).args(args).spawn() {
-            eprintln!("scrannotate: failed to launch: {e}");
+        crate::diag!("tray: spawning child {:?} {:?}", exe.file_name(), args);
+        match Command::new(exe).args(args).env(crate::diag::CHILD_ENV, "1").spawn() {
+            Ok(child) => crate::diag!("tray: spawned child pid={}", child.id()),
+            Err(e) => crate::diag!("tray: spawn FAILED: {e}"),
         }
     }
 }
@@ -286,14 +300,16 @@ impl ApplicationHandler<UserEvent> for App {
         event_loop.set_control_flow(ControlFlow::Wait);
         if !self.started {
             self.started = true;
+            crate::diag!("tray: event loop resumed — running one-time start()");
             if let Err(e) = self.start() {
-                eprintln!("scrannotate: {e:#}");
+                crate::diag!("tray: start() FAILED — {e:#}");
                 event_loop.exit();
             }
         }
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
+        crate::diag!("tray: user_event {event:?}");
         match event {
             UserEvent::Capture => self.spawn_capture(),
             UserEvent::OpenSettings => self.open_settings(),

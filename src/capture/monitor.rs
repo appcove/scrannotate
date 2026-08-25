@@ -54,24 +54,44 @@ pub fn screen_list() -> Result<String> {
 
 /// Grab one frame from the display bound to screen `slot` (1-based).
 pub fn capture_screenshot(embed_cursor: bool, slot: u32) -> Result<Capture> {
+    crate::diag!("monitor: enumerating displays (embed_cursor={embed_cursor}, slot={slot})");
     let mut displays = displays()?;
     let count = displays.len();
+    for (i, d) in displays.iter().enumerate() {
+        crate::diag!(
+            "monitor: display[{}] = '{}' {}x{}{}",
+            i + 1,
+            d.name,
+            d.width,
+            d.height,
+            if d.is_primary { " [primary]" } else { "" }
+        );
+    }
     let index = usize::try_from(slot.saturating_sub(1)).unwrap_or(usize::MAX);
     if index >= count {
+        crate::diag!("monitor: slot {slot} out of range ({count} displays)");
         bail!(
             "screen {slot} does not exist — {count} display{} available (--pick-screen lists them)",
             if count == 1 { "" } else { "s" }
         );
     }
     let display = displays.swap_remove(index);
+    crate::diag!("monitor: selected screen {slot} = '{}' {}x{}", display.name, display.width, display.height);
 
+    crate::diag!("monitor: building capture session");
     let mut session = session::builder(embed_cursor)
         .video_target(VideoCaptureTarget::Display(display.id.clone()))
         .build()
         .context("building capture session")?;
+    crate::diag!("monitor: starting capture session");
     session.start().context("starting capture")?;
+    crate::diag!("monitor: waiting for a frame…");
     let image = session::take_frame(&mut session, Duration::from_millis(150));
     session.stop().ok();
+    match &image {
+        Ok(img) => crate::diag!("monitor: frame received {}x{}", img.width(), img.height()),
+        Err(e) => crate::diag!("monitor: frame FAILED — {e:#}"),
+    }
 
     Ok(Capture {
         image: image?,

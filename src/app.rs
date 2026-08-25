@@ -76,6 +76,14 @@ impl ScreencapApp {
         demo_mode: Option<String>,
         capture_display: Option<crate::capture::DisplayInfo>,
     ) -> Self {
+        crate::diag!(
+            "editor: ScreencapApp::new image={}x{} select_full={} demo={} out_dir={:?}",
+            img.width(),
+            img.height(),
+            select_full,
+            demo_mode.is_some(),
+            out_dir,
+        );
         #[cfg(not(any(target_os = "macos", windows)))]
         let _ = capture_display; // placement is the compositor's job there
         let min_dim = img.width().min(img.height());
@@ -220,10 +228,12 @@ impl ScreencapApp {
 
     /// Save the region; optionally quit. On failure stay open either way.
     fn save(&mut self, ctx: &Context, close: bool) {
+        crate::diag!("action: SAVE (close={close}) → dir {:?}", self.out_dir);
         let result =
             self.rendered().and_then(|img| export::save_timestamped(&img, &self.out_dir));
         match result {
             Ok(path) => {
+                crate::diag!("action: SAVE ok → {}", path.display());
                 println!("{}", path.display());
                 if close {
                     ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -231,22 +241,30 @@ impl ScreencapApp {
                     self.set_toast(ctx, format!("Saved {}", path.display()), false);
                 }
             }
-            Err(err) => self.set_toast(ctx, format!("Save failed: {err:#}"), true),
+            Err(err) => {
+                crate::diag!("action: SAVE FAILED — {err:#}");
+                self.set_toast(ctx, format!("Save failed: {err:#}"), true)
+            }
         }
     }
 
     /// Copy the region to the clipboard; optionally quit. On failure stay
     /// open either way.
     fn copy(&mut self, ctx: &Context, close: bool) {
+        crate::diag!("action: COPY (close={close})");
         match self.rendered().and_then(|img| clipboard::copy_image(&img)) {
             Ok(()) => {
+                crate::diag!("action: COPY ok");
                 if close {
                     ctx.send_viewport_cmd(ViewportCommand::Close);
                 } else {
                     self.set_toast(ctx, "Copied to the clipboard", false);
                 }
             }
-            Err(err) => self.set_toast(ctx, format!("Copy failed: {err:#}"), true),
+            Err(err) => {
+                crate::diag!("action: COPY FAILED — {err:#}");
+                self.set_toast(ctx, format!("Copy failed: {err:#}"), true)
+            }
         }
     }
 
@@ -397,10 +415,14 @@ impl ScreencapApp {
             return;
         }
         self.placed = true;
+        crate::diag!("editor: first frame — placing window on captured monitor");
         if self.demo {
             return; // demo runs windowed for deterministic screenshots
         }
-        let Some(win) = frame.winit_window() else { return };
+        let Some(win) = frame.winit_window() else {
+            crate::diag!("editor: no winit window yet for placement");
+            return;
+        };
         let target = self.capture_display.take();
 
         #[cfg(windows)]
