@@ -99,6 +99,34 @@ pub fn run(combo: Combo, screen: u32) -> Result<()> {
     Ok(())
 }
 
+/// Human-readable exit description, naming the signal on a crash (SIGSEGV /
+/// SIGABRT etc.) so a child's failure is obvious in the log.
+fn describe_exit(status: std::process::ExitStatus) -> String {
+    if let Some(code) = status.code() {
+        return format!("exit code {code}");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(sig) = status.signal() {
+            let name = match sig {
+                2 => "SIGINT",
+                4 => "SIGILL",
+                6 => "SIGABRT",
+                8 => "SIGFPE",
+                9 => "SIGKILL",
+                10 => "SIGBUS",
+                11 => "SIGSEGV",
+                13 => "SIGPIPE",
+                15 => "SIGTERM",
+                _ => "signal",
+            };
+            return format!("killed by signal {sig} ({name})");
+        }
+    }
+    format!("{status:?}")
+}
+
 fn parse_hotkey(combo: &Combo) -> Result<HotKey> {
     combo
         .accelerator()
@@ -289,7 +317,19 @@ impl App {
         };
         crate::diag!("tray: spawning child {:?} {:?}", exe.file_name(), args);
         match Command::new(exe).args(args).env(crate::diag::CHILD_ENV, "1").spawn() {
-            Ok(child) => crate::diag!("tray: spawned child pid={}", child.id()),
+            Ok(mut child) => {
+                let pid = child.id();
+                crate::diag!("tray: spawned child pid={pid}");
+                // Reap the child on a thread and log how it exited, so a crash
+                // (signal) is recorded even if the child logged nothing itself.
+                let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
+                std::thread::spawn(move || match child.wait() {
+                    Ok(status) => {
+                        crate::diag!("tray: child pid={pid} {args:?} exited: {}", describe_exit(status))
+                    }
+                    Err(e) => crate::diag!("tray: child pid={pid} wait failed: {e}"),
+                });
+            }
             Err(e) => crate::diag!("tray: spawn FAILED: {e}"),
         }
     }
