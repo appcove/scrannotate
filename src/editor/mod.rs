@@ -859,19 +859,23 @@ impl Editor {
         match edit.target {
             Some(id) => {
                 let Some(ann) = self.doc.get(id) else { return };
-                let Shape::Text { text: old, .. } = &ann.shape else { return };
+                let Shape::Text { text: old, pos: old_pos } = &ann.shape else { return };
+                // The box can be dragged while editing, so its position is
+                // as much an edit as the text is.
+                let moved = edit.pos != *old_pos;
                 if text.is_empty() {
                     self.doc.begin();
                     self.doc.remove(id);
                     self.doc.commit();
                     self.selected.remove(&id);
-                } else if text != *old || edit.style != ann.style {
+                } else if text != *old || edit.style != ann.style || moved {
                     self.doc.begin();
                     if let Some(ann) = self.doc.get_mut(id) {
                         // Style tweaks made while editing land with the text.
                         ann.style = edit.style;
-                        if let Shape::Text { text: slot, .. } = &mut ann.shape {
+                        if let Shape::Text { text: slot, pos } = &mut ann.shape {
                             *slot = text;
+                            *pos = edit.pos;
                         }
                     }
                     self.doc.commit();
@@ -1410,6 +1414,55 @@ mod tests {
                 .iter()
                 .any(|(_, a)| matches!(&a.shape, Shape::Text { text, .. } if text == "kept"))
         );
+    }
+
+    /// The grip on the inline editor moves `TextEditState::pos`; a new text
+    /// has to land where the box was dragged to, not where it opened.
+    #[test]
+    fn dragging_the_box_while_typing_moves_the_committed_text() {
+        let mut ed = editor();
+        ed.set_tool(Tool::Text);
+        ed.text_tool_click(Pos2::new(100.0, 100.0), &measure);
+        let EditorState::TextEditing(edit) = &mut ed.state else { panic!("editing") };
+        edit.buffer = "hello".into();
+        edit.pos += Vec2::new(40.0, 25.0);
+        ed.commit_text();
+        let (_, ann) = ed.doc.annotations().last().expect("one annotation");
+        let Shape::Text { pos, text } = &ann.shape else { panic!("text") };
+        assert_eq!(text.as_str(), "hello");
+        assert_eq!(*pos, Pos2::new(140.0, 125.0));
+    }
+
+    /// Re-editing used to write back only the text and style, so a box that
+    /// was dragged mid-edit snapped home on commit. A move alone is an edit.
+    #[test]
+    fn moving_the_box_while_re_editing_persists_and_undoes() {
+        let mut ed = editor();
+        ed.doc.begin();
+        let id = ed.doc.push(Annotation::new(
+            Shape::Text { pos: Pos2::new(200.0, 150.0), text: "note".into() },
+            ed.style,
+        ));
+        ed.doc.commit();
+
+        ed.open_text_editor(id);
+        let EditorState::TextEditing(edit) = &mut ed.state else { panic!("editing") };
+        // Position is the only thing that changes here.
+        edit.pos = Pos2::new(260.0, 190.0);
+        ed.commit_text();
+
+        let Shape::Text { pos, text } = &ed.doc.get(id).expect("kept").shape else {
+            panic!("text")
+        };
+        assert_eq!(text.as_str(), "note");
+        assert_eq!(*pos, Pos2::new(260.0, 190.0));
+
+        assert!(ed.doc.can_undo());
+        ed.undo();
+        let Shape::Text { pos, .. } = &ed.doc.get(id).expect("restored").shape else {
+            panic!("text")
+        };
+        assert_eq!(*pos, Pos2::new(200.0, 150.0));
     }
 
     #[test]

@@ -1,11 +1,13 @@
 //! Inline text editing: a frameless TextEdit rendered at the text's spot,
 //! with the same font/color the committed annotation will have. Never
-//! soft-wraps — lines break only at typed newlines.
+//! soft-wraps — lines break only at typed newlines. A grip pinned to the
+//! box drags it, so text can be repositioned without committing first.
 
 use eframe::egui::text_selection::CCursorRange;
 use eframe::egui::widgets::text_edit::TextEditState;
 use eframe::egui::{
-    self, Color32, Context, FontId, Id, Key, Margin, Modifiers, Rect, TextEdit, Ui,
+    self, Align2, Color32, Context, FontId, Id, Key, Margin, Modifiers, Rect, Sense, TextEdit, Ui,
+    Vec2,
 };
 
 use crate::editor::Editor;
@@ -14,6 +16,11 @@ use crate::editor::state::EditorState;
 /// Explicit id for the inline TextEdit, so its cursor can be read back out
 /// of egui memory *before* the widget runs this frame.
 const INPUT_ID: &str = "text-editor-input";
+/// Height of the drag grip, in screen px.
+const GRIP_H: f32 = 20.0;
+/// Floor for the grip's width: an empty buffer measures near zero, and the
+/// grip is the only way to move a box before anything is typed into it.
+const GRIP_MIN_W: f32 = 54.0;
 
 /// Something the text editor deliberately declined to handle.
 pub enum TextEditAction {
@@ -24,6 +31,8 @@ pub enum TextEditAction {
 
 pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEditAction> {
     let view = editor.view;
+    // Read before the state borrow: the grip clamps the box to the image.
+    let img = editor.doc.image_rect();
     let mut commit = false;
     let mut cancel = false;
     let EditorState::TextEditing(edit) = &mut editor.state else { return None };
@@ -59,10 +68,23 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
             f.layout_no_wrap(buf.as_str().to_owned(), layout_font.clone(), text_color)
         })
     };
+    let grip_w = width.max(GRIP_MIN_W);
+    // The grip rides above the box, unless the box sits close enough to the
+    // top of the canvas that there is no room for it up there.
+    let grip_above = screen_pos.y - GRIP_H >= canvas.min.y;
+    let area_pos = if grip_above { screen_pos - Vec2::new(0.0, GRIP_H) } else { screen_pos };
+    let mut grip = None;
     egui::Area::new(Id::new("text-editor"))
-        .fixed_pos(screen_pos)
+        .fixed_pos(area_pos)
         .order(egui::Order::Foreground)
         .show(ctx, |ui| {
+            // Nothing between grip and box: the TextEdit has to land exactly
+            // on screen_pos or it stops lining up with the text it stands in
+            // for.
+            ui.spacing_mut().item_spacing.y = 0.0;
+            if grip_above {
+                grip = Some(drag_grip(ui, grip_w));
+            }
             // Plain Enter commits — consumed *before* the TextEdit runs, or
             // the widget first inserts a newline at the cursor and that
             // newline lands in the committed text (trim_end only strips
@@ -89,16 +111,57 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
                 response.request_focus();
                 edit.just_created = false;
             }
+            if !grip_above {
+                grip = Some(drag_grip(ui, grip_w));
+            }
             if ui.input(|i| i.key_pressed(Key::Escape)) {
                 cancel = true;
             }
         });
+    // Outside the closure: a drag reports screen px, but `pos` is in image
+    // coords, so the delta has to come back through the zoom.
+    if let Some(grip) = grip {
+        if grip.dragged() {
+            edit.pos = (edit.pos + grip.drag_delta() / view.zoom).clamp(img.min, img.max);
+        }
+        // Pressing anywhere outside the TextEdit clears egui's focus, which
+        // would leave the keyboard nowhere. Hand it back when the drag ends.
+        if grip.drag_stopped() {
+            ctx.memory_mut(|m| m.request_focus(Id::new(INPUT_ID)));
+        }
+    }
     if cancel {
         editor.cancel_text();
     } else if commit {
         editor.commit_text();
     }
     None
+}
+
+/// The box's drag handle: a dotted bar the width of the editor. Drawn with
+/// its own fill rather than the egui widget visuals because it sits over
+/// captured pixels, which can be any color at all.
+fn drag_grip(ui: &mut Ui, width: f32) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, GRIP_H), Sense::drag());
+    let hot = resp.hovered() || resp.dragged();
+    ui.painter().rect_filled(
+        rect,
+        4.0,
+        if hot { Color32::from_black_alpha(200) } else { Color32::from_black_alpha(140) },
+    );
+    ui.painter().text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        "• • •",
+        FontId::proportional(13.0),
+        if hot { Color32::WHITE } else { Color32::from_gray(205) },
+    );
+    if resp.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+    } else if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+    }
+    resp
 }
 
 /// Does Ctrl+C belong to the app rather than to the text editor? Only when
