@@ -22,6 +22,11 @@ use crate::editor::hit::{Measure, annotation_bbox, handle_at, item_handles, topm
 use crate::editor::state::{EditorState, ItemDragKind, RegionMode, TextEditState};
 use crate::view::View;
 
+/// Separator between the `trigger: result` pairs of a status line. The
+/// leading space is non-breaking, which pins the separator to the pair it
+/// follows so a wrapped line never opens with a stray `·`.
+const HINT_SEP: &str = "\u{a0}· ";
+
 /// What Esc did; `Quit` means the second Esc of the discard confirmation
 /// landed — the app should close.
 #[derive(PartialEq, Eq, Debug)]
@@ -113,52 +118,74 @@ impl Editor {
     }
 
     /// The status line: what the current state means / affords right now.
+    ///
+    /// One shape throughout, so the line can be skimmed instead of read:
+    /// `Mode — trigger: result · trigger: result`. The dash splits the state
+    /// you are in from what you can do about it, and every affordance is the
+    /// same `trigger: result` pair, likeliest first. Gestures stay lower
+    /// case (drag, click, release, scroll); keys keep their own casing (Esc,
+    /// Enter, Del, Ctrl+C, Shift+drag). Keeping to it is what makes the line
+    /// scannable — a one-off phrasing costs the reader a re-read.
     pub fn status(&self) -> (StatusKind, String) {
-        let hint = |s: &str| (StatusKind::Hint, s.to_owned());
+        // Assembled in one place so the shape cannot drift: the mode, then
+        // the pairs, joined by the one separator.
+        let line = |mode: &str, parts: &[&str]| {
+            (StatusKind::Hint, format!("{mode} — {}", parts.join(HINT_SEP)))
+        };
         match &self.state {
+            // The alert asks a question; a shortcut list would bury it.
             EditorState::ConfirmDiscard { .. } => {
-                (StatusKind::Alert, "Press Esc again to close and discard".to_owned())
+                (StatusKind::Alert, "Esc again to discard and close".to_owned())
             }
-            EditorState::TextEditing(_) => {
-                hint("Type · Enter: done · Shift+Enter: new line · Ctrl+C: copy & close · Esc: cancel")
+            EditorState::TextEditing(_) => line(
+                "Typing",
+                &["Enter: done", "Shift+Enter: line break", "Ctrl+C: copy & close", "Esc: cancel"],
+            ),
+            EditorState::DrawingShape { .. } => {
+                line("Drawing", &["release: place it", "Esc: cancel"])
             }
-            EditorState::DrawingShape { .. } => hint("Release to place · Esc: cancel"),
-            EditorState::RegionDraw { .. } => hint("Release to set the region · Esc: cancel"),
-            EditorState::RegionAdjust { .. } => hint("Release to keep · Esc: put it back"),
-            EditorState::ItemsDrag { .. } => hint("Release to keep · Esc: put it back"),
-            EditorState::RubberBand { .. } => hint("Release to select what's inside"),
-            EditorState::Panning => hint("Panning — release to stop"),
+            EditorState::RegionDraw { .. } => {
+                line("New region", &["release: set it", "Esc: cancel"])
+            }
+            EditorState::RegionAdjust { .. } => {
+                line("Adjusting region", &["release: keep it", "Esc: put it back"])
+            }
+            EditorState::ItemsDrag { .. } => {
+                line("Moving", &["release: keep it", "Esc: put it back"])
+            }
+            EditorState::RubberBand { .. } => line("Selecting", &["release: take what's inside"]),
+            EditorState::Panning => line("Panning", &["release: stop"]),
             EditorState::Idle => {
                 if self.doc.region.is_none() {
-                    return hint(
-                        "Drag out a region · Enter: copy whole screen · scroll: zoom",
+                    return line(
+                        "No region yet",
+                        &["drag: pick an area", "Enter: copy whole screen", "scroll: zoom"],
                     );
                 }
                 match self.tool {
-                    Tool::Select if !self.selected.is_empty() => (
-                        StatusKind::Hint,
-                        format!(
-                            "{} selected · drag: move · Shift+drag: add · Del: delete · Esc: deselect",
-                            self.selected.len()
-                        ),
+                    // The count takes the mode slot: it is what just changed.
+                    Tool::Select if !self.selected.is_empty() => line(
+                        &format!("{} selected", self.selected.len()),
+                        &["drag: move", "Shift+drag: add", "Del: delete", "Esc: deselect"],
                     ),
-                    Tool::Select => hint(
-                        "Drag a box to select · Shift+drag: add · click an item · right-drag: new region",
+                    Tool::Select => line(
+                        "Select",
+                        &[
+                            "drag: box-select",
+                            "click: pick one",
+                            "Shift+drag: add",
+                            "right-drag: new region",
+                            "Esc Esc: discard",
+                        ],
                     ),
-                    Tool::Text => hint("Click to place text · click existing text to edit it"),
-                    Tool::Marker => (
-                        StatusKind::Hint,
-                        format!(
-                            "Click to drop marker {} · drag to pull an arrow out of it",
-                            self.doc.marker_next
-                        ),
+                    Tool::Text => line("Text", &["click: place", "click existing text: edit"]),
+                    Tool::Marker => line(
+                        &format!("Marker {}", self.doc.marker_next),
+                        &["click: drop it", "drag: pull an arrow out"],
                     ),
-                    tool => (
-                        StatusKind::Hint,
-                        format!(
-                            "Drag to draw a {} · tap Space for Select · right-drag: new region",
-                            tool.label()
-                        ),
+                    tool => line(
+                        tool.label(),
+                        &["drag: draw", "tap Space: Select", "right-drag: new region"],
                     ),
                 }
             }
@@ -859,19 +886,23 @@ impl Editor {
         match edit.target {
             Some(id) => {
                 let Some(ann) = self.doc.get(id) else { return };
-                let Shape::Text { text: old, .. } = &ann.shape else { return };
+                let Shape::Text { text: old, pos: old_pos } = &ann.shape else { return };
+                // The box can be dragged while editing, so its position is
+                // as much an edit as the text is.
+                let moved = edit.pos != *old_pos;
                 if text.is_empty() {
                     self.doc.begin();
                     self.doc.remove(id);
                     self.doc.commit();
                     self.selected.remove(&id);
-                } else if text != *old || edit.style != ann.style {
+                } else if text != *old || edit.style != ann.style || moved {
                     self.doc.begin();
                     if let Some(ann) = self.doc.get_mut(id) {
                         // Style tweaks made while editing land with the text.
                         ann.style = edit.style;
-                        if let Shape::Text { text: slot, .. } = &mut ann.shape {
+                        if let Shape::Text { text: slot, pos } = &mut ann.shape {
                             *slot = text;
+                            *pos = edit.pos;
                         }
                     }
                     self.doc.commit();
@@ -1410,6 +1441,116 @@ mod tests {
                 .iter()
                 .any(|(_, a)| matches!(&a.shape, Shape::Text { text, .. } if text == "kept"))
         );
+    }
+
+    /// The grip on the inline editor moves `TextEditState::pos`; a new text
+    /// has to land where the box was dragged to, not where it opened.
+    #[test]
+    fn dragging_the_box_while_typing_moves_the_committed_text() {
+        let mut ed = editor();
+        ed.set_tool(Tool::Text);
+        ed.text_tool_click(Pos2::new(100.0, 100.0), &measure);
+        let EditorState::TextEditing(edit) = &mut ed.state else { panic!("editing") };
+        edit.buffer = "hello".into();
+        edit.pos += Vec2::new(40.0, 25.0);
+        ed.commit_text();
+        let (_, ann) = ed.doc.annotations().last().expect("one annotation");
+        let Shape::Text { pos, text } = &ann.shape else { panic!("text") };
+        assert_eq!(text.as_str(), "hello");
+        assert_eq!(*pos, Pos2::new(140.0, 125.0));
+    }
+
+    /// Re-editing used to write back only the text and style, so a box that
+    /// was dragged mid-edit snapped home on commit. A move alone is an edit.
+    #[test]
+    fn moving_the_box_while_re_editing_persists_and_undoes() {
+        let mut ed = editor();
+        ed.doc.begin();
+        let id = ed.doc.push(Annotation::new(
+            Shape::Text { pos: Pos2::new(200.0, 150.0), text: "note".into() },
+            ed.style,
+        ));
+        ed.doc.commit();
+
+        ed.open_text_editor(id);
+        let EditorState::TextEditing(edit) = &mut ed.state else { panic!("editing") };
+        // Position is the only thing that changes here.
+        edit.pos = Pos2::new(260.0, 190.0);
+        ed.commit_text();
+
+        let Shape::Text { pos, text } = &ed.doc.get(id).expect("kept").shape else {
+            panic!("text")
+        };
+        assert_eq!(text.as_str(), "note");
+        assert_eq!(*pos, Pos2::new(260.0, 190.0));
+
+        assert!(ed.doc.can_undo());
+        ed.undo();
+        let Shape::Text { pos, .. } = &ed.doc.get(id).expect("restored").shape else {
+            panic!("text")
+        };
+        assert_eq!(*pos, Pos2::new(200.0, 150.0));
+    }
+
+    /// The uniform shape is the whole point of the status line — one
+    /// off-pattern phrasing is what makes the reader stop and parse. Every
+    /// hint states a mode, then `trigger: result` pairs.
+    #[test]
+    fn every_hint_follows_the_status_format() {
+        let check = |label: &str, s: &str| {
+            let (mode, rest) =
+                s.split_once(" — ").unwrap_or_else(|| panic!("{label}: no mode in {s:?}"));
+            assert!(!mode.is_empty(), "{label}: empty mode in {s:?}");
+            for part in rest.split(HINT_SEP) {
+                // A plain separator would let a wrapped line open with `·`.
+                assert!(!part.contains(" · "), "{label}: plain separator in {s:?}");
+                assert!(
+                    part.split_once(": ").is_some_and(|(t, r)| !t.is_empty() && !r.is_empty()),
+                    "{label}: {part:?} is not `trigger: result`",
+                );
+            }
+        };
+
+        // No region yet: the one idle hint that does not depend on the tool.
+        let mut ed = editor();
+        let (kind, s) = ed.status();
+        assert_eq!(kind, StatusKind::Hint);
+        check("no region", &s);
+
+        ed.doc.region = Some(Rect::from_min_max(Pos2::ZERO, Pos2::new(100.0, 100.0)));
+        // Every tool, so a new one cannot land with off-pattern wording.
+        for tool in [
+            Tool::Select,
+            Tool::Text,
+            Tool::Marker,
+            Tool::Arrow,
+            Tool::Line,
+            Tool::Pen,
+            Tool::Rect,
+            Tool::Ellipse,
+            Tool::Highlight,
+            Tool::Pixelate,
+        ] {
+            ed.set_tool(tool);
+            let (kind, s) = ed.status();
+            assert_eq!(kind, StatusKind::Hint, "{tool:?}");
+            check(&format!("{tool:?}"), &s);
+        }
+
+        // Select with something in hand takes a different arm.
+        let id = add_highlight(&mut ed, Rect::from_min_max(Pos2::ZERO, Pos2::new(10.0, 10.0)));
+        ed.set_tool(Tool::Select);
+        ed.selected.insert(id);
+        let (kind, s) = ed.status();
+        assert_eq!(kind, StatusKind::Hint);
+        assert!(s.starts_with("1 selected — "), "count leads the line: {s:?}");
+        check("select with selection", &s);
+
+        // The discard confirmation is deliberately not a shortcut list.
+        ed.state = EditorState::ConfirmDiscard { until: 0.0 };
+        let (kind, s) = ed.status();
+        assert_eq!(kind, StatusKind::Alert);
+        assert!(!s.contains(" — "), "the alert stays a sentence: {s:?}");
     }
 
     #[test]

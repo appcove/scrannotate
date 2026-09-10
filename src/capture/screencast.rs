@@ -1,5 +1,6 @@
-//! Linux frame capture via the ScreenCast portal + PipeWire (pinray): raw
-//! RGBA frames over shared memory, no encoding, no disk.
+//! Wayland frame capture via the ScreenCast portal + PipeWire (pinray): raw
+//! RGBA frames over shared memory, no encoding, no disk. (X11 sessions use
+//! [`super::monitor`] instead — displays are enumerable there.)
 //!
 //! Each screen *slot* persists its own portal grant (restore token), so
 //! `--screen N` shows the chooser once per slot and is silent after that.

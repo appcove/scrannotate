@@ -1,9 +1,10 @@
-//! Direct display capture for macOS and Windows: unlike the Wayland portal,
-//! these platforms let an app enumerate monitors and pick one, so
-//! `--screen N` is simply the Nth display in [`screen_list`] order — no
-//! chooser dialog, no persisted grant. On macOS the first capture triggers
-//! the system's Screen Recording permission flow (pinray requests it; the
-//! grant is attributed to whatever app launched the process).
+//! Direct display capture for macOS, Windows, and Linux/X11: unlike the
+//! Wayland portal, these platforms let an app enumerate monitors and pick
+//! one, so `--screen N` is simply the Nth display in [`screen_list`] order —
+//! no chooser dialog, no persisted grant. On macOS the first capture
+//! triggers the system's Screen Recording permission flow (pinray requests
+//! it; the grant is attributed to whatever app launched the process). On
+//! X11 pinray reads the screen directly (RandR monitors, polled GetImage).
 
 use std::time::Duration;
 
@@ -78,11 +79,11 @@ pub fn capture_screenshot(embed_cursor: bool, slot: u32) -> Result<Capture> {
         display: Some(DisplayInfo {
             #[cfg(target_os = "macos")]
             id: display.id.0,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             name: display.name,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             width: display.width,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             height: display.height,
         }),
     })

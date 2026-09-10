@@ -9,11 +9,38 @@ pub struct View {
     pub pan: Vec2,
     /// False until the first fit (or after a reset that wants a refit).
     pub fitted: bool,
+    /// Canvas size the last fit used. A fullscreen window can reach its
+    /// final size frames after the first paint (X11 WMs apply fullscreen
+    /// asynchronously; macOS's simple fullscreen resizes late too), so a
+    /// fit taken at the startup size goes stale and must be redone.
+    fitted_canvas: Vec2,
+    /// The user zoomed or panned deliberately — their view wins over any
+    /// canvas-resize refit until the next explicit fit.
+    adjusted: bool,
 }
 
 impl View {
     pub fn new() -> Self {
-        Self { zoom: 1.0, pan: Vec2::ZERO, fitted: false }
+        Self {
+            zoom: 1.0,
+            pan: Vec2::ZERO,
+            fitted: false,
+            fitted_canvas: Vec2::ZERO,
+            adjusted: false,
+        }
+    }
+
+    /// Whether the view should be (re)fitted to a canvas of `canvas_size`:
+    /// never fitted yet, or auto-fitted to a canvas that has since changed
+    /// size — unless the user has taken the view over.
+    pub fn needs_fit(&self, canvas_size: Vec2) -> bool {
+        !self.fitted || (!self.adjusted && self.fitted_canvas != canvas_size)
+    }
+
+    /// Pan by a screen-space delta (a deliberate view adjustment).
+    pub fn pan_by(&mut self, delta: Vec2) {
+        self.pan += delta;
+        self.adjusted = true;
     }
 
     pub fn to_screen(self, canvas: Rect, p: Pos2) -> Pos2 {
@@ -44,6 +71,9 @@ impl View {
             .clamp(0.02, 1.0);
         self.pan = canvas_size * 0.5 - rect.center().to_vec2() * self.zoom;
         self.fitted = true;
+        self.fitted_canvas = canvas_size;
+        // An explicit fit re-arms the canvas-resize refit.
+        self.adjusted = false;
     }
 
     /// Frame the whole image.
@@ -59,6 +89,7 @@ impl View {
         let rel = pointer - canvas.min - self.pan;
         self.pan += rel * (1.0 - factor);
         self.zoom = new_zoom;
+        self.adjusted = true;
     }
 }
 
@@ -85,6 +116,38 @@ mod tests {
         assert_eq!(v.pan, Vec2::new(450.0, 200.0));
         v.fit(Vec2::new(2000.0, 1000.0), Vec2::new(1000.0, 500.0));
         assert!((v.zoom - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn refits_when_the_canvas_resizes_under_an_untouched_view() {
+        let mut v = View::new();
+        assert!(v.needs_fit(Vec2::new(800.0, 600.0)));
+        // The X11 startup race: first paint happens before the WM applies
+        // fullscreen, so the first fit sees a small window...
+        v.fit(Vec2::new(1920.0, 1080.0), Vec2::new(800.0, 600.0));
+        assert!(!v.needs_fit(Vec2::new(800.0, 600.0)));
+        // ...and the fullscreen resize must trigger a refit.
+        assert!(v.needs_fit(Vec2::new(1920.0, 1080.0)));
+        v.fit(Vec2::new(1920.0, 1080.0), Vec2::new(1920.0, 1080.0));
+        assert!(!v.needs_fit(Vec2::new(1920.0, 1080.0)));
+        assert_eq!(v.zoom, 1.0);
+        assert_eq!(v.pan, Vec2::ZERO);
+    }
+
+    #[test]
+    fn a_user_adjusted_view_survives_canvas_resizes() {
+        let mut v = View::new();
+        v.fit(Vec2::new(1920.0, 1080.0), Vec2::new(800.0, 600.0));
+        v.pan_by(Vec2::new(10.0, 0.0));
+        assert!(!v.needs_fit(Vec2::new(1920.0, 1080.0)), "pan takes the view over");
+        let mut v = View::new();
+        v.fit(Vec2::new(1920.0, 1080.0), Vec2::new(800.0, 600.0));
+        let canvas = Rect::from_min_size(Pos2::ZERO, Vec2::new(800.0, 600.0));
+        v.zoom_about(canvas, Pos2::new(400.0, 300.0), 2.0);
+        assert!(!v.needs_fit(Vec2::new(1920.0, 1080.0)), "zoom takes the view over");
+        // An explicit fit (F / Reset view) hands the view back.
+        v.fit(Vec2::new(1920.0, 1080.0), Vec2::new(1920.0, 1080.0));
+        assert!(v.needs_fit(Vec2::new(2560.0, 1440.0)));
     }
 
     #[test]

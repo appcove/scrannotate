@@ -10,7 +10,7 @@ use eframe::egui::{
 
 use crate::annotate::Tool;
 use crate::editor::{Editor, StatusKind};
-use crate::ui::{ACCENT, ACTIVE_TOOL_FILL, TOOLS, color_picker};
+use crate::ui::{ACCENT, ACTIVE_TOOL_FILL, BTN_H, TOOLBAR_W, TOOLS, color_picker};
 
 /// Actions the toolbar can't perform itself (they need export/clipboard/
 /// viewport access); the app layer executes them.
@@ -36,7 +36,12 @@ pub struct Toolbar {
 
 impl Toolbar {
     pub fn new() -> Self {
-        Self { pos: None, size: Vec2::new(300.0, 700.0) }
+        // Only the first frame's auto-placement reads this; the measured
+        // rect replaces it after that.
+        Self {
+            pos: None,
+            size: Vec2::new(TOOLBAR_W + 30.0, 700.0),
+        }
     }
 
     pub fn show(
@@ -49,7 +54,11 @@ impl Toolbar {
         // Initial region selection shows nothing but the frozen frame and
         // the crosshairs — no toolbar until a region exists (and no picker
         // left behind to pop back up later).
-        let Some(ss) = editor.doc.region.map(|r| editor.view.rect_to_screen(canvas, r)) else {
+        let Some(ss) = editor
+            .doc
+            .region
+            .map(|r| editor.view.rect_to_screen(canvas, r))
+        else {
             editor.color_picker = None;
             return None;
         };
@@ -74,11 +83,12 @@ impl Toolbar {
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_width(270.0);
+                    ui.set_width(TOOLBAR_W);
                     // Chunky, easy-to-hit controls that stand out from the
                     // popup background.
                     let spacing = ui.spacing_mut();
-                    spacing.slider_width = 230.0;
+                    // Rail, less the drag-value box egui puts beside it.
+                    spacing.slider_width = TOOLBAR_W - 40.0;
                     spacing.button_padding = Vec2::new(10.0, 8.0);
                     spacing.item_spacing = Vec2::new(8.0, 7.0);
                     spacing.interact_size = Vec2::new(40.0, 34.0);
@@ -119,20 +129,18 @@ impl Toolbar {
                         ui.horizontal(|ui| {
                             for (tool, key) in pair {
                                 let active = editor.tool == *tool;
-                                let text =
-                                    RichText::new(format!("{key:?} · {}", tool.label()))
-                                        .size(15.0)
-                                        .color(if active {
-                                            Color32::WHITE
-                                        } else {
-                                            Color32::from_gray(235)
-                                        });
-                                let mut btn =
-                                    Button::new(text).min_size(Vec2::new(half, 36.0));
+                                let text = RichText::new(format!("{key:?} · {}", tool.label()))
+                                    .size(15.0)
+                                    .color(if active {
+                                        Color32::WHITE
+                                    } else {
+                                        Color32::from_gray(235)
+                                    });
+                                let mut btn = Button::new(text);
                                 if active {
                                     btn = btn.fill(ACTIVE_TOOL_FILL);
                                 }
-                                let resp = ui.add(btn);
+                                let resp = ui.add_sized(Vec2::new(half, BTN_H), btn);
                                 if resp.clicked() {
                                     resp.surrender_focus();
                                     editor.set_tool(*tool);
@@ -165,7 +173,8 @@ impl Toolbar {
                     // Current color; click to open the picker.
                     let (swatch_rect, swatch) = ui
                         .allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
-                    ui.painter().rect_filled(swatch_rect, 4.0, shown_style.color);
+                    ui.painter()
+                        .rect_filled(swatch_rect, 4.0, shown_style.color);
                     ui.painter().rect_stroke(
                         swatch_rect,
                         4.0,
@@ -179,7 +188,11 @@ impl Toolbar {
                         Align2::CENTER_CENTER,
                         "Color…",
                         FontId::proportional(15.0),
-                        if luma > 140.0 { Color32::BLACK } else { Color32::WHITE },
+                        if luma > 140.0 {
+                            Color32::BLACK
+                        } else {
+                            Color32::WHITE
+                        },
                     );
                     if swatch.clicked() {
                         editor.color_picker = Some(shown_style.color);
@@ -213,30 +226,32 @@ impl Toolbar {
                     }
                     ui.separator();
 
-                    // Paired action buttons.
-                    let pair = |ui: &mut egui::Ui,
-                                    a: (&str, bool),
-                                    b: (&str, bool)|
-                     -> (bool, bool) {
-                        let mut clicked = (false, false);
-                        ui.horizontal(|ui| {
-                            for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
-                                let btn = ui.add_enabled(
-                                    enabled,
-                                    Button::new(label).min_size(Vec2::new(half, 34.0)),
-                                );
-                                if btn.clicked() {
-                                    btn.surrender_focus();
-                                    if i == 0 {
-                                        clicked.0 = true;
-                                    } else {
-                                        clicked.1 = true;
+                    // Paired action buttons. `add_sized` allocates the rect
+                    // before laying the label out inside it, so a long label
+                    // can no longer push its button past its half of the row
+                    // the way `min_size` (a floor, not a width) allowed.
+                    let pair =
+                        |ui: &mut egui::Ui, a: (&str, bool), b: (&str, bool)| -> (bool, bool) {
+                            let mut clicked = (false, false);
+                            ui.horizontal(|ui| {
+                                for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
+                                    let btn = ui
+                                        .add_enabled_ui(enabled, |ui| {
+                                            ui.add_sized(Vec2::new(half, BTN_H), Button::new(label))
+                                        })
+                                        .inner;
+                                    if btn.clicked() {
+                                        btn.surrender_focus();
+                                        if i == 0 {
+                                            clicked.0 = true;
+                                        } else {
+                                            clicked.1 = true;
+                                        }
                                     }
                                 }
-                            }
-                        });
-                        clicked
-                    };
+                            });
+                            clicked
+                        };
                     let (undo, redo) = pair(
                         ui,
                         ("Undo  Ctrl+Z", editor.doc.can_undo()),
@@ -256,24 +271,26 @@ impl Toolbar {
                         editor.reset_all();
                     }
                     ui.separator();
-                    let (copy, copy_close) =
-                        pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
+                    let (copy, copy_close) = pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
                     if copy_close {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
-                    let (save, save_close) =
-                        pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
+                    let (save, save_close) = pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }
                     if save_close {
                         action = Some(ToolbarAction::Save { close: true });
                     }
+                    // Spans the popup instead of shrink-wrapping its label.
                     if ui
-                        .add(Button::new("Close  Esc").min_size(Vec2::new(0.0, 34.0)))
+                        .add_sized(
+                            Vec2::new(ui.available_width(), BTN_H),
+                            Button::new("Close  Esc"),
+                        )
                         .clicked()
                     {
                         action = Some(ToolbarAction::Close);
@@ -300,13 +317,14 @@ impl Toolbar {
                             }
                         },
                     };
-                    egui::Frame::default().fill(bg).corner_radius(4.0).inner_margin(8.0).show(
-                        ui,
-                        |ui| {
+                    egui::Frame::default()
+                        .fill(bg)
+                        .corner_radius(4.0)
+                        .inner_margin(8.0)
+                        .show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             ui.label(RichText::new(message).color(fg).size(13.0));
-                        },
-                    );
+                        });
                 });
             });
         self.size = area.response.rect.size();
