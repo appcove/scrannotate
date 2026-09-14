@@ -136,13 +136,20 @@ impl Toolbar {
 
                     // Toolbar density: a tiny, always-visible setting near
                     // the top rather than buried in a menu, so it's easy to
-                    // find the first time the default doesn't fit.
-                    ui.horizontal(|ui| {
+                    // find the first time the default doesn't fit. The label
+                    // sits on its own centered line — same pattern as "For
+                    // New Objects" below — so the three buttons start flush
+                    // with the panel's left edge instead of wherever the
+                    // label happened to end, lining their span up with
+                    // every other full-width row (tool pairs, action pairs).
+                    ui.vertical_centered(|ui| {
                         ui.label(
                             RichText::new("UI size")
                                 .size((11.0 * scale).round().max(9.0))
                                 .color(ui.visuals().weak_text_color()),
                         );
+                    });
+                    ui.horizontal(|ui| {
                         let third = (ui.available_width() - 2.0 * gap) / 3.0;
                         for opt in UiScale::ALL {
                             let active = self.ui_scale == opt;
