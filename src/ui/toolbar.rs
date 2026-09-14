@@ -134,32 +134,30 @@ impl Toolbar {
                     }
                     ui.separator();
 
-                    // Toolbar density: a tiny, always-visible setting near
-                    // the top rather than buried in a menu, so it's easy to
-                    // find the first time the default doesn't fit. Three
-                    // permanently-visible buttons claimed a whole grid row
-                    // for a setting almost nobody touches twice; a compact
-                    // dropdown shows the current size at a glance and only
-                    // expands into the three options on click.
+                    // Toolbar density: three buttons, each an "A" drawn at
+                    // that option's own relative size, so the row previews
+                    // the effect directly instead of naming it. No heading
+                    // — self-explanatory, and one less line for a setting
+                    // almost nobody touches twice.
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("UI size")
-                                .size((11.0 * scale).round().max(9.0))
-                                .color(ui.visuals().weak_text_color()),
-                        );
-                        // A real combo box, not a menu button rigged up to
-                        // look like one: its dropdown arrow is painted as a
-                        // little triangle rather than a text glyph, so it
-                        // can't come out as a missing-character box the way
-                        // a Unicode arrow character did here before.
-                        egui::ComboBox::from_id_salt("ui-scale")
-                            .width((90.0 * scale).round())
-                            .selected_text(self.ui_scale.name())
-                            .show_ui(ui, |ui| {
-                                for opt in UiScale::ALL {
-                                    ui.selectable_value(&mut self.ui_scale, opt, opt.name());
-                                }
-                            });
+                        let third = (ui.available_width() - 2.0 * gap) / 3.0;
+                        for opt in UiScale::ALL {
+                            let active = self.ui_scale == opt;
+                            let text = RichText::new("A").size((16.0 * opt.factor()).round()).color(
+                                if active { Color32::WHITE } else { Color32::from_gray(235) },
+                            );
+                            let mut btn = Button::new(text);
+                            if active {
+                                btn = btn.fill(ACTIVE_TOOL_FILL);
+                            }
+                            let resp = ui
+                                .add_sized(Vec2::new(third, (24.0 * scale).round()), btn)
+                                .on_hover_text(opt.name());
+                            if resp.clicked() {
+                                resp.surrender_focus();
+                                self.ui_scale = opt;
+                            }
+                        }
                     });
                     ui.separator();
 
