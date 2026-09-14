@@ -134,16 +134,22 @@ impl Toolbar {
                     }
                     ui.separator();
 
-                    // Toolbar density: three buttons, each an "A" drawn at
-                    // that option's own relative size, so the row previews
-                    // the effect directly instead of naming it. No heading
-                    // — self-explanatory, and one less line for a setting
-                    // almost nobody touches twice.
+                    // Toolbar density: three small buttons, each an "A"
+                    // drawn at that option's own relative size, so the row
+                    // previews the effect directly instead of naming it. No
+                    // heading, and — unlike every grid row below — not
+                    // stretched to the panel's full width: this is a rarely
+                    // -touched setting, not a primary action, so it sits
+                    // small and tucked to the right instead of claiming the
+                    // same visual weight as Undo or Copy.
                     ui.horizontal(|ui| {
-                        let third = (ui.available_width() - 2.0 * gap) / 3.0;
+                        let btn_w = (24.0 * scale).round();
+                        let btn_h = (20.0 * scale).round();
+                        let used = 3.0 * btn_w + 2.0 * gap;
+                        ui.add_space((ui.available_width() - used).max(0.0));
                         for opt in UiScale::ALL {
                             let active = self.ui_scale == opt;
-                            let text = RichText::new("A").size((16.0 * opt.factor()).round()).color(
+                            let text = RichText::new("A").size((14.0 * opt.factor()).round()).color(
                                 if active { Color32::WHITE } else { Color32::from_gray(235) },
                             );
                             let mut btn = Button::new(text);
@@ -151,7 +157,7 @@ impl Toolbar {
                                 btn = btn.fill(ACTIVE_TOOL_FILL);
                             }
                             let resp = ui
-                                .add_sized(Vec2::new(third, (24.0 * scale).round()), btn)
+                                .add_sized(Vec2::new(btn_w, btn_h), btn)
                                 .on_hover_text(opt.name());
                             if resp.clicked() {
                                 resp.surrender_focus();
