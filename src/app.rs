@@ -104,7 +104,7 @@ impl ScreencapApp {
             editor,
             texture: None,
             baked_pixelates: Vec::new(),
-            toolbar: toolbar::Toolbar::new(),
+            toolbar: toolbar::Toolbar::new(saved.ui_scale.unwrap_or_default()),
             toast: None,
             last_canvas_size: Vec2::new(1400.0, 850.0),
             out_dir,
@@ -504,6 +504,7 @@ impl eframe::App for ScreencapApp {
         prefs::save(
             &self.editor.palette,
             self.editor.persist_style.then_some(&self.editor.style),
+            self.toolbar.ui_scale,
         );
     }
 

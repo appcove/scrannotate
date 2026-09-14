@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use eframe::egui::Color32;
 
 use crate::annotate::Style;
+use crate::ui::UiScale;
 
 /// `$XDG_STATE_HOME/scrannotate` (default `~/.local/state/scrannotate`).
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -37,6 +38,10 @@ pub struct Prefs {
     pub palette: Option<Vec<Color32>>,
     pub width: Option<f32>,
     pub font_size: Option<f32>,
+    /// Toolbar density. Unlike `width`/`font_size`, always written once the
+    /// user has touched it — there's no resolution-scaled default it could
+    /// clobber.
+    pub ui_scale: Option<UiScale>,
 }
 
 fn parse_color(hex: &str) -> Option<Color32> {
@@ -73,6 +78,9 @@ pub fn load() -> Prefs {
                 prefs.font_size =
                     value.trim().parse().ok().filter(|s| (6.0..=400.0).contains(s));
             }
+            "ui_scale" => {
+                prefs.ui_scale = UiScale::parse(value);
+            }
             _ => {}
         }
     }
@@ -80,14 +88,14 @@ pub fn load() -> Prefs {
 }
 
 /// `style: None` keeps sizes out of the file (they stay session defaults).
-pub fn save(palette: &[Color32], style: Option<&Style>) {
+pub fn save(palette: &[Color32], style: Option<&Style>, ui_scale: UiScale) {
     let Some(path) = prefs_path() else { return };
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
     let palette_line =
         palette.iter().map(|c| format_color(*c)).collect::<Vec<_>>().join(",");
-    let mut contents = format!("palette={palette_line}\n");
+    let mut contents = format!("palette={palette_line}\nui_scale={}\n", ui_scale.as_str());
     if let Some(style) = style {
         contents.push_str(&format!("width={}\nfont_size={}\n", style.width, style.font_size));
     }

@@ -10,7 +10,7 @@ use eframe::egui::{
 
 use crate::annotate::Tool;
 use crate::editor::{Editor, StatusKind};
-use crate::ui::{ACCENT, ACTIVE_TOOL_FILL, BTN_H, TOOLBAR_W, TOOLS, color_picker};
+use crate::ui::{ACCENT, ACTIVE_TOOL_FILL, BTN_H, TOOLBAR_W, TOOLS, UiScale, color_picker};
 
 /// Actions the toolbar can't perform itself (they need export/clipboard/
 /// viewport access); the app layer executes them.
@@ -32,16 +32,19 @@ pub struct Toolbar {
     pos: Option<Pos2>,
     /// Rect measured last frame, for the auto placement.
     size: Vec2,
+    /// User-chosen toolbar density; persisted via `prefs`.
+    pub ui_scale: UiScale,
+    /// Tallest the status line has needed to be so far this session, so it
+    /// can only grow — never shrink back down and make the panel jump.
+    status_min_h: f32,
 }
 
 impl Toolbar {
-    pub fn new() -> Self {
+    pub fn new(ui_scale: UiScale) -> Self {
         // Only the first frame's auto-placement reads this; the measured
         // rect replaces it after that.
-        Self {
-            pos: None,
-            size: Vec2::new(TOOLBAR_W + 30.0, 700.0),
-        }
+        let w = TOOLBAR_W * ui_scale.factor();
+        Self { pos: None, size: Vec2::new(w + 30.0, 700.0), ui_scale, status_min_h: 0.0 }
     }
 
     pub fn show(
@@ -78,20 +81,26 @@ impl Toolbar {
         let lo = canvas.min;
         let hi = (canvas.max - size).max(lo);
         let pos = self.pos.unwrap_or(default_pos).clamp(lo, hi);
+        // Every size in the panel derives from this one factor, so Small,
+        // Medium, and Large stay proportional instead of drifting apart.
+        let scale = self.ui_scale.factor();
+        let toolbar_w = (TOOLBAR_W * scale).round();
+        let btn_h = (BTN_H * scale).round();
+        let btn_font = (15.0 * scale).round().max(10.0);
         let area = egui::Area::new(Id::new("toolbar"))
             .fixed_pos(pos)
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_width(TOOLBAR_W);
+                    ui.set_width(toolbar_w);
                     // Chunky, easy-to-hit controls that stand out from the
                     // popup background.
                     let spacing = ui.spacing_mut();
                     // Rail, less the drag-value box egui puts beside it.
-                    spacing.slider_width = TOOLBAR_W - 40.0;
-                    spacing.button_padding = Vec2::new(10.0, 8.0);
-                    spacing.item_spacing = Vec2::new(8.0, 7.0);
-                    spacing.interact_size = Vec2::new(40.0, 34.0);
+                    spacing.slider_width = toolbar_w - 40.0 * scale;
+                    spacing.button_padding = Vec2::new(8.0, 6.0) * scale;
+                    spacing.item_spacing = Vec2::new(6.0, 6.0) * scale;
+                    spacing.interact_size = Vec2::new(36.0 * scale, btn_h);
                     let visuals = ui.visuals_mut();
                     visuals.widgets.inactive.weak_bg_fill = Color32::from_gray(58);
                     visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_gray(235));
@@ -100,18 +109,21 @@ impl Toolbar {
                     visuals.widgets.active.weak_bg_fill = Color32::from_gray(96);
                     let styles = &mut ui.style_mut().text_styles;
                     if let Some(font) = styles.get_mut(&egui::TextStyle::Button) {
-                        font.size = 15.0;
+                        font.size = btn_font;
                     }
                     if let Some(font) = styles.get_mut(&egui::TextStyle::Body) {
-                        font.size = 15.0;
+                        font.size = btn_font;
                     }
-                    let (grip_rect, grip) = ui
-                        .allocate_exact_size(Vec2::new(ui.available_width(), 22.0), Sense::drag());
+                    let gap = ui.spacing().item_spacing.x;
+                    let (grip_rect, grip) = ui.allocate_exact_size(
+                        Vec2::new(ui.available_width(), 22.0 * scale),
+                        Sense::drag(),
+                    );
                     ui.painter().text(
                         grip_rect.center(),
                         Align2::CENTER_CENTER,
                         "• • •",
-                        FontId::proportional(14.0),
+                        FontId::proportional((14.0 * scale).round().max(10.0)),
                         ui.visuals().weak_text_color(),
                     );
                     if grip.hovered() || grip.dragged() {
@@ -122,15 +134,44 @@ impl Toolbar {
                     }
                     ui.separator();
 
+                    // Toolbar density: a tiny, always-visible setting near
+                    // the top rather than buried in a menu, so it's easy to
+                    // find the first time the default doesn't fit.
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("UI size")
+                                .size((11.0 * scale).round().max(9.0))
+                                .color(ui.visuals().weak_text_color()),
+                        );
+                        let third = (ui.available_width() - 2.0 * gap) / 3.0;
+                        for opt in UiScale::ALL {
+                            let active = self.ui_scale == opt;
+                            let text = RichText::new(opt.letter())
+                                .size((13.0 * scale).round().max(10.0))
+                                .color(if active { Color32::WHITE } else { Color32::from_gray(235) });
+                            let mut btn = Button::new(text);
+                            if active {
+                                btn = btn.fill(ACTIVE_TOOL_FILL);
+                            }
+                            let resp = ui
+                                .add_sized(Vec2::new(third, (22.0 * scale).round()), btn)
+                                .on_hover_text(opt.name());
+                            if resp.clicked() {
+                                resp.surrender_focus();
+                                self.ui_scale = opt;
+                            }
+                        }
+                    });
+                    ui.separator();
+
                     // Tools, two per row.
-                    let gap = ui.spacing().item_spacing.x;
                     let half = (ui.available_width() - gap) / 2.0;
                     for pair in TOOLS.chunks(2) {
                         ui.horizontal(|ui| {
                             for (tool, key) in pair {
                                 let active = editor.tool == *tool;
                                 let text = RichText::new(format!("{key:?} · {}", tool.label()))
-                                    .size(15.0)
+                                    .size(btn_font)
                                     .color(if active {
                                         Color32::WHITE
                                     } else {
@@ -140,7 +181,7 @@ impl Toolbar {
                                 if active {
                                     btn = btn.fill(ACTIVE_TOOL_FILL);
                                 }
-                                let resp = ui.add_sized(Vec2::new(half, BTN_H), btn);
+                                let resp = ui.add_sized(Vec2::new(half, btn_h), btn);
                                 if resp.clicked() {
                                     resp.surrender_focus();
                                     editor.set_tool(*tool);
@@ -171,8 +212,10 @@ impl Toolbar {
                         }
                     });
                     // Current color; click to open the picker.
-                    let (swatch_rect, swatch) = ui
-                        .allocate_exact_size(Vec2::new(ui.available_width(), 30.0), Sense::click());
+                    let (swatch_rect, swatch) = ui.allocate_exact_size(
+                        Vec2::new(ui.available_width(), 30.0 * scale),
+                        Sense::click(),
+                    );
                     ui.painter()
                         .rect_filled(swatch_rect, 4.0, shown_style.color);
                     ui.painter().rect_stroke(
@@ -187,7 +230,7 @@ impl Toolbar {
                         swatch_rect.center(),
                         Align2::CENTER_CENTER,
                         "Color…",
-                        FontId::proportional(15.0),
+                        FontId::proportional(btn_font),
                         if luma > 140.0 {
                             Color32::BLACK
                         } else {
@@ -237,7 +280,7 @@ impl Toolbar {
                                 for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
                                     let btn = ui
                                         .add_enabled_ui(enabled, |ui| {
-                                            ui.add_sized(Vec2::new(half, BTN_H), Button::new(label))
+                                            ui.add_sized(Vec2::new(half, btn_h), Button::new(label))
                                         })
                                         .inner;
                                     if btn.clicked() {
@@ -254,8 +297,8 @@ impl Toolbar {
                         };
                     let (undo, redo) = pair(
                         ui,
-                        ("Undo  Ctrl+Z", editor.doc.can_undo()),
-                        ("Redo  Ctrl+Y", editor.doc.can_redo()),
+                        ("Undo Ctrl+Z", editor.doc.can_undo()),
+                        ("Redo Ctrl+Y", editor.doc.can_redo()),
                     );
                     if undo {
                         editor.undo();
@@ -263,7 +306,7 @@ impl Toolbar {
                     if redo {
                         editor.redo();
                     }
-                    let (fit, reset) = pair(ui, ("Reset view  F", true), ("Reset all", true));
+                    let (fit, reset) = pair(ui, ("Reset view F", true), ("Reset all", true));
                     if fit {
                         editor.view.fit(editor.doc.image_size(), canvas.size());
                     }
@@ -271,14 +314,14 @@ impl Toolbar {
                         editor.reset_all();
                     }
                     ui.separator();
-                    let (copy, copy_close) = pair(ui, ("Copy", true), ("Copy+Close  Ctrl+C", true));
+                    let (copy, copy_close) = pair(ui, ("Copy", true), ("Copy+Close Ctrl+C", true));
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
                     if copy_close {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
-                    let (save, save_close) = pair(ui, ("Save", true), ("Save+Close  Ctrl+S", true));
+                    let (save, save_close) = pair(ui, ("Save", true), ("Save+Close Ctrl+S", true));
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }
@@ -288,8 +331,8 @@ impl Toolbar {
                     // Spans the popup instead of shrink-wrapping its label.
                     if ui
                         .add_sized(
-                            Vec2::new(ui.available_width(), BTN_H),
-                            Button::new("Close  Esc"),
+                            Vec2::new(ui.available_width(), btn_h),
+                            Button::new("Close Esc"),
                         )
                         .clicked()
                     {
@@ -298,32 +341,59 @@ impl Toolbar {
                     ui.separator();
 
                     // The status line: app-level results/errors win over the
-                    // editor's own state message.
-                    let (bg, fg, message) = match &status_override {
+                    // editor's own state message. Only a genuine alert (the
+                    // discard confirmation) or an error gets a filled,
+                    // colored callout — a plain hint or success message
+                    // renders as bare text so it can't be mistaken for a
+                    // (non-clickable) button.
+                    let status_font = (14.0 * scale).round().max(11.0);
+                    let (fill, fg, message) = match &status_override {
                         Some(over) if over.is_error => (
-                            Color32::from_rgb(0x7a, 0x1d, 0x1d),
+                            Some(Color32::from_rgb(0x7a, 0x1d, 0x1d)),
                             Color32::WHITE,
                             over.message.clone(),
                         ),
-                        Some(over) => {
-                            (Color32::from_gray(60), Color32::WHITE, over.message.clone())
-                        }
+                        Some(over) => (None, Color32::from_gray(220), over.message.clone()),
                         None => match editor.status() {
                             (StatusKind::Alert, message) => {
-                                (Color32::from_rgb(0xf2, 0xd0, 0x2e), Color32::BLACK, message)
+                                (Some(Color32::from_rgb(0xf2, 0xd0, 0x2e)), Color32::BLACK, message)
                             }
                             (StatusKind::Hint, message) => {
-                                (Color32::from_gray(45), Color32::from_gray(200), message)
+                                (None, Color32::from_gray(210), message)
                             }
                         },
                     };
+                    // The status line's height only ever grows to fit the
+                    // longest message shown so far this session — never
+                    // shrinks — so switching between a one-line hint and a
+                    // wrapped one can't make the whole panel jump.
+                    let pad = 8.0 * scale;
+                    let wrap_width = (ui.available_width() - 2.0 * pad).max(10.0);
+                    let galley = ctx.fonts_mut(|f| {
+                        f.layout(
+                            message.clone(),
+                            FontId::proportional(status_font),
+                            fg,
+                            wrap_width,
+                        )
+                    });
+                    self.status_min_h = self.status_min_h.max(galley.size().y + pad * 2.0);
                     egui::Frame::default()
-                        .fill(bg)
-                        .corner_radius(4.0)
-                        .inner_margin(8.0)
+                        .fill(fill.unwrap_or(Color32::TRANSPARENT))
+                        .corner_radius(if fill.is_some() { 4.0 } else { 0.0 })
+                        .inner_margin(pad)
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
-                            ui.label(RichText::new(message).color(fg).size(13.0));
+                            let inner_h = (self.status_min_h - pad * 2.0).max(0.0);
+                            ui.set_min_height(inner_h);
+                            // Centered vertically in the reserved space, so
+                            // a short message doesn't sit pinned to the top
+                            // of a box sized for a longer one.
+                            let extra = (inner_h - galley.size().y).max(0.0);
+                            if extra > 0.0 {
+                                ui.add_space(extra / 2.0);
+                            }
+                            ui.label(RichText::new(message).color(fg).size(status_font));
                         });
                 });
             });
