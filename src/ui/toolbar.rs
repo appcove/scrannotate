@@ -142,29 +142,46 @@ impl Toolbar {
                     // -touched setting, not a primary action, so it sits
                     // small and tucked to the right instead of claiming the
                     // same visual weight as Undo or Copy.
-                    ui.horizontal(|ui| {
-                        let btn_w = (24.0 * scale).round();
-                        let btn_h = (20.0 * scale).round();
-                        let used = 3.0 * btn_w + 2.0 * gap;
-                        ui.add_space((ui.available_width() - used).max(0.0));
-                        for opt in UiScale::ALL {
-                            let active = self.ui_scale == opt;
-                            let text = RichText::new("A").size((14.0 * opt.factor()).round()).color(
-                                if active { Color32::WHITE } else { Color32::from_gray(235) },
-                            );
-                            let mut btn = Button::new(text);
-                            if active {
-                                btn = btn.fill(ACTIVE_TOOL_FILL);
+                    // Pinned to an exact height and laid out right-to-left,
+                    // rather than a plain `ui.horizontal` nudged over with
+                    // `add_space`: a bare horizontal layout reserves at
+                    // least `spacing().interact_size.y` (still the big
+                    // 32px-ish tool-button height at this point) for its
+                    // row even when its content is shorter, which is what
+                    // left these buttons sitting in the lower half of a
+                    // taller-than-they-are band instead of flush under the
+                    // separator above.
+                    let small_h = (20.0 * scale).round();
+                    ui.allocate_ui_with_layout(
+                        Vec2::new(ui.available_width(), small_h),
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            let btn_w = (24.0 * scale).round();
+                            // Belt and braces: `add_sized` below already
+                            // forces the buttons themselves to `small_h`,
+                            // but interact_size still leaks into a layout's
+                            // own row-height bookkeeping in places
+                            // `add_sized` doesn't reach, so pin it too.
+                            ui.spacing_mut().interact_size = Vec2::new(btn_w, small_h);
+                            for opt in UiScale::ALL.into_iter().rev() {
+                                let active = self.ui_scale == opt;
+                                let text =
+                                    RichText::new("A").size((14.0 * opt.factor()).round()).color(
+                                        if active { Color32::WHITE } else { Color32::from_gray(235) },
+                                    );
+                                let mut btn = Button::new(text);
+                                if active {
+                                    btn = btn.fill(ACTIVE_TOOL_FILL);
+                                }
+                                let resp =
+                                    ui.add_sized(Vec2::new(btn_w, small_h), btn).on_hover_text(opt.name());
+                                if resp.clicked() {
+                                    resp.surrender_focus();
+                                    self.ui_scale = opt;
+                                }
                             }
-                            let resp = ui
-                                .add_sized(Vec2::new(btn_w, btn_h), btn)
-                                .on_hover_text(opt.name());
-                            if resp.clicked() {
-                                resp.surrender_focus();
-                                self.ui_scale = opt;
-                            }
-                        }
-                    });
+                        },
+                    );
                     ui.separator();
 
                     // Tools, two per row.
