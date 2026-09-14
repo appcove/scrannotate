@@ -136,38 +136,30 @@ impl Toolbar {
 
                     // Toolbar density: a tiny, always-visible setting near
                     // the top rather than buried in a menu, so it's easy to
-                    // find the first time the default doesn't fit. The label
-                    // sits on its own centered line — same pattern as "For
-                    // New Objects" below — so the three buttons start flush
-                    // with the panel's left edge instead of wherever the
-                    // label happened to end, lining their span up with
-                    // every other full-width row (tool pairs, action pairs).
-                    ui.vertical_centered(|ui| {
+                    // find the first time the default doesn't fit. Three
+                    // permanently-visible buttons claimed a whole grid row
+                    // for a setting almost nobody touches twice; a compact
+                    // dropdown shows the current size at a glance and only
+                    // expands into the three options on click.
+                    ui.horizontal(|ui| {
                         ui.label(
                             RichText::new("UI size")
                                 .size((11.0 * scale).round().max(9.0))
                                 .color(ui.visuals().weak_text_color()),
                         );
-                    });
-                    ui.horizontal(|ui| {
-                        let third = (ui.available_width() - 2.0 * gap) / 3.0;
-                        for opt in UiScale::ALL {
-                            let active = self.ui_scale == opt;
-                            let text = RichText::new(opt.letter())
-                                .size((13.0 * scale).round().max(10.0))
-                                .color(if active { Color32::WHITE } else { Color32::from_gray(235) });
-                            let mut btn = Button::new(text);
-                            if active {
-                                btn = btn.fill(ACTIVE_TOOL_FILL);
-                            }
-                            let resp = ui
-                                .add_sized(Vec2::new(third, (22.0 * scale).round()), btn)
-                                .on_hover_text(opt.name());
-                            if resp.clicked() {
-                                resp.surrender_focus();
-                                self.ui_scale = opt;
-                            }
-                        }
+                        // A real combo box, not a menu button rigged up to
+                        // look like one: its dropdown arrow is painted as a
+                        // little triangle rather than a text glyph, so it
+                        // can't come out as a missing-character box the way
+                        // a Unicode arrow character did here before.
+                        egui::ComboBox::from_id_salt("ui-scale")
+                            .width((90.0 * scale).round())
+                            .selected_text(self.ui_scale.name())
+                            .show_ui(ui, |ui| {
+                                for opt in UiScale::ALL {
+                                    ui.selectable_value(&mut self.ui_scale, opt, opt.name());
+                                }
+                            });
                     });
                     ui.separator();
 

@@ -50,16 +50,7 @@ impl UiScale {
         }
     }
 
-    /// Single-letter label for the tiny in-toolbar picker.
-    pub fn letter(self) -> &'static str {
-        match self {
-            UiScale::Small => "S",
-            UiScale::Medium => "M",
-            UiScale::Large => "L",
-        }
-    }
-
-    /// Full name, for the picker's tooltip.
+    /// Full name, shown on the dropdown trigger and its menu items.
     pub fn name(self) -> &'static str {
         match self {
             UiScale::Small => "Small",
