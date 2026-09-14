@@ -273,32 +273,42 @@ impl Toolbar {
                     // before laying the label out inside it, so a long label
                     // can no longer push its button past its half of the row
                     // the way `min_size` (a floor, not a width) allowed.
-                    let pair =
-                        |ui: &mut egui::Ui, a: (&str, bool), b: (&str, bool)| -> (bool, bool) {
-                            let mut clicked = (false, false);
-                            ui.horizontal(|ui| {
-                                for (i, (label, enabled)) in [a, b].into_iter().enumerate() {
-                                    let btn = ui
-                                        .add_enabled_ui(enabled, |ui| {
-                                            ui.add_sized(Vec2::new(half, btn_h), Button::new(label))
-                                        })
-                                        .inner;
-                                    if btn.clicked() {
-                                        btn.surrender_focus();
-                                        if i == 0 {
-                                            clicked.0 = true;
-                                        } else {
-                                            clicked.1 = true;
-                                        }
+                    // `accent` marks the row's default action (the one that
+                    // closes the window) with the same blue as an active
+                    // tool, so it reads as the recommended button at a
+                    // glance instead of blending into Undo/Redo/Reset.
+                    let pair = |ui: &mut egui::Ui,
+                                a: (&str, bool, bool),
+                                b: (&str, bool, bool)|
+                     -> (bool, bool) {
+                        let mut clicked = (false, false);
+                        ui.horizontal(|ui| {
+                            for (i, (label, enabled, accent)) in [a, b].into_iter().enumerate() {
+                                let mut btn = Button::new(label);
+                                if accent {
+                                    btn = btn.fill(ACTIVE_TOOL_FILL);
+                                }
+                                let btn = ui
+                                    .add_enabled_ui(enabled, |ui| {
+                                        ui.add_sized(Vec2::new(half, btn_h), btn)
+                                    })
+                                    .inner;
+                                if btn.clicked() {
+                                    btn.surrender_focus();
+                                    if i == 0 {
+                                        clicked.0 = true;
+                                    } else {
+                                        clicked.1 = true;
                                     }
                                 }
-                            });
-                            clicked
-                        };
+                            }
+                        });
+                        clicked
+                    };
                     let (undo, redo) = pair(
                         ui,
-                        ("Undo Ctrl+Z", editor.doc.can_undo()),
-                        ("Redo Ctrl+Y", editor.doc.can_redo()),
+                        ("Undo Ctrl+Z", editor.doc.can_undo(), false),
+                        ("Redo Ctrl+Y", editor.doc.can_redo(), false),
                     );
                     if undo {
                         editor.undo();
@@ -306,7 +316,8 @@ impl Toolbar {
                     if redo {
                         editor.redo();
                     }
-                    let (fit, reset) = pair(ui, ("Reset view F", true), ("Reset all", true));
+                    let (fit, reset) =
+                        pair(ui, ("Reset view F", true, false), ("Reset all", true, false));
                     if fit {
                         editor.view.fit(editor.doc.image_size(), canvas.size());
                     }
@@ -314,14 +325,16 @@ impl Toolbar {
                         editor.reset_all();
                     }
                     ui.separator();
-                    let (copy, copy_close) = pair(ui, ("Copy", true), ("Copy+Close Ctrl+C", true));
+                    let (copy, copy_close) =
+                        pair(ui, ("Copy", true, false), ("Copy+Close Ctrl+C", true, true));
                     if copy {
                         action = Some(ToolbarAction::Copy { close: false });
                     }
                     if copy_close {
                         action = Some(ToolbarAction::Copy { close: true });
                     }
-                    let (save, save_close) = pair(ui, ("Save", true), ("Save+Close Ctrl+S", true));
+                    let (save, save_close) =
+                        pair(ui, ("Save", true, false), ("Save+Close Ctrl+S", true, true));
                     if save {
                         action = Some(ToolbarAction::Save { close: false });
                     }
