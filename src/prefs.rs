@@ -1,9 +1,11 @@
 //! Persisted user preferences: a tiny `key=value` file in the same state
 //! directory as the portal restore token ([`state_dir`]). Stores the
-//! recently-used color palette, and — only once the user has deliberately
-//! adjusted them — the stroke width and font size. Untouched sizes stay
-//! resolution-scaled defaults and are never written, so a small capture's
-//! defaults can't leak into a 4K session.
+//! recently-used color palette and the toolbar's UI size (Small/Medium/
+//! Large), and — only once the user has deliberately adjusted them — the
+//! stroke width and font size. Untouched sizes stay resolution-scaled
+//! defaults and are never written, so a small capture's defaults can't leak
+//! into a 4K session; the UI size has no such resolution-scaled default, so
+//! it's written unconditionally, every time.
 
 use std::path::PathBuf;
 

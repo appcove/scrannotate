@@ -95,12 +95,20 @@ impl Toolbar {
                     ui.set_width(toolbar_w);
                     // Chunky, easy-to-hit controls that stand out from the
                     // popup background.
+                    // The width DragValue floors itself at (see egui's
+                    // `DragValue`: its box is `min_size(interact_size)`
+                    // regardless of content) plus the gap before it —
+                    // shared with `interact_size`/`item_spacing` below so
+                    // the slider math can't drift from what they actually
+                    // are again.
+                    let interact_w = 36.0 * scale;
+                    let gap_w = 6.0 * scale;
                     let spacing = ui.spacing_mut();
                     // Rail, less the drag-value box egui puts beside it.
-                    spacing.slider_width = toolbar_w - 40.0 * scale;
+                    spacing.slider_width = toolbar_w - interact_w - gap_w;
                     spacing.button_padding = Vec2::new(8.0, 6.0) * scale;
-                    spacing.item_spacing = Vec2::new(6.0, 6.0) * scale;
-                    spacing.interact_size = Vec2::new(36.0 * scale, btn_h);
+                    spacing.item_spacing = Vec2::new(gap_w, gap_w);
+                    spacing.interact_size = Vec2::new(interact_w, btn_h);
                     let visuals = ui.visuals_mut();
                     visuals.widgets.inactive.weak_bg_fill = Color32::from_gray(58);
                     visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_gray(235));
@@ -157,18 +165,30 @@ impl Toolbar {
                         egui::Layout::right_to_left(egui::Align::Center),
                         |ui| {
                             let btn_w = (24.0 * scale).round();
-                            // Belt and braces: `add_sized` below already
-                            // forces the buttons themselves to `small_h`,
-                            // but interact_size still leaks into a layout's
-                            // own row-height bookkeeping in places
-                            // `add_sized` doesn't reach, so pin it too.
+                            // `add_sized`'s size is a floor, not a cap —
+                            // Button's own min_size.y is unioned with
+                            // `interact_size.y` (harmless, pinned to
+                            // `small_h` below) but its *content* height
+                            // (glyph + button_padding) is never clamped
+                            // down to fit. With button_padding untouched
+                            // and the "Large" glyph deliberately drawn
+                            // bigger, that button alone came out ~27px
+                            // tall against a 20px target. Zero the padding
+                            // here so content height is the glyph alone,
+                            // and scale that glyph by *both* the chosen
+                            // option's own relative size and the active
+                            // toolbar scale, so it can't exceed `small_h`.
                             ui.spacing_mut().interact_size = Vec2::new(btn_w, small_h);
+                            ui.spacing_mut().button_padding = Vec2::ZERO;
                             for opt in UiScale::ALL.into_iter().rev() {
                                 let active = self.ui_scale == opt;
-                                let text =
-                                    RichText::new("A").size((14.0 * opt.factor()).round()).color(
-                                        if active { Color32::WHITE } else { Color32::from_gray(235) },
-                                    );
+                                let text = RichText::new("A")
+                                    .size((14.0 * opt.factor() * scale).round().max(8.0))
+                                    .color(if active {
+                                        Color32::WHITE
+                                    } else {
+                                        Color32::from_gray(235)
+                                    });
                                 let mut btn = Button::new(text);
                                 if active {
                                     btn = btn.fill(ACTIVE_TOOL_FILL);
@@ -177,7 +197,31 @@ impl Toolbar {
                                     ui.add_sized(Vec2::new(btn_w, small_h), btn).on_hover_text(opt.name());
                                 if resp.clicked() {
                                     resp.surrender_focus();
-                                    self.ui_scale = opt;
+                                    if self.ui_scale != opt {
+                                        self.ui_scale = opt;
+                                        // The panel is about to change size,
+                                        // but `pos`'s clamp this frame was
+                                        // already computed from last frame's
+                                        // (now-stale) `self.size` — a
+                                        // toolbar docked near the canvas
+                                        // edge could render past it for this
+                                        // one frame. Ask for an immediate
+                                        // repaint so the next frame's
+                                        // correctly-measured clamp lands
+                                        // right away, instead of waiting on
+                                        // whatever future input happens to
+                                        // trigger one.
+                                        ctx.request_repaint();
+                                        // Same staleness bug, for the status
+                                        // line: its reserved height is a
+                                        // high-water mark in screen px at
+                                        // the *old* scale's font/padding,
+                                        // so shrinking the toolbar would
+                                        // otherwise leave the status box
+                                        // too tall until a longer message
+                                        // happened to grow it again.
+                                        self.status_min_h = 0.0;
+                                    }
                                 }
                             }
                         },
@@ -260,7 +304,7 @@ impl Toolbar {
                     if swatch.clicked() {
                         editor.color_picker = Some(shown_style.color);
                     }
-                    color_picker::show(ctx, editor, canvas, swatch_rect);
+                    color_picker::show(ctx, editor, canvas, swatch_rect, scale);
                     ui.label("Width");
                     let mut width_val = shown_style.width;
                     let mut size_val = shown_style.font_size;
@@ -400,7 +444,12 @@ impl Toolbar {
                     // longest message shown so far this session — never
                     // shrinks — so switching between a one-line hint and a
                     // wrapped one can't make the whole panel jump.
-                    let pad = 8.0 * scale;
+                    // Rounded because `Frame::inner_margin` below rounds it
+                    // too (`Margin` stores whole px) — otherwise this pass
+                    // and the label egui actually lays out wrap at very
+                    // slightly different widths, and a message can come out
+                    // one line taller than what was reserved for it.
+                    let pad = (8.0 * scale).round();
                     let wrap_width = (ui.available_width() - 2.0 * pad).max(10.0);
                     let galley = ctx.fonts_mut(|f| {
                         f.layout(

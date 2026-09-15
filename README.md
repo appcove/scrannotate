@@ -49,13 +49,17 @@ no save prompts.
   labeled "For Current Object" or "For New Objects" and shows the target's
   actual color/width/size. A large color picker keeps your recently used
   colors one click away.
+- **A toolbar sized to you.** Three small buttons at the top scale the
+  whole panel — width, buttons, every font — between Small, Medium, and
+  Large.
 - **Pixel-identical export.** The PNG/clipboard renderer (tiny-skia) shares
   its geometry with the on-screen renderer, so what you see is exactly what
   you ship — including rotated shapes and rotated text.
 - **Respectful of your flow.** Copy (`Enter`/`Ctrl+C`) puts the region on
   the clipboard and closes; Save (`Ctrl+S`) writes a PNG and closes; `Esc`
   steps back and double-`Esc` discards — never a confirmation dialog.
-  Preferences (recent colors, deliberately-set sizes) persist between runs.
+  Preferences (recent colors, deliberately-set sizes, toolbar UI size)
+  persist between runs.
 
 ## Install
 
@@ -236,11 +240,12 @@ Click the color swatch in the toolbar's settings section:
 Recently used colors form a most-recently-used stack (clicking one loads it
 into the picker), and colors you actually draw with bubble to its head. The
 recents — plus stroke width and text size once you've deliberately adjusted
-them — persist between runs in a small state directory:
-`$XDG_STATE_HOME/scrannotate` on Linux (default
+them, and the toolbar's Small/Medium/Large UI size — persist between runs in
+a small state directory: `$XDG_STATE_HOME/scrannotate` on Linux (default
 `~/.local/state/scrannotate`), `~/Library/Application Support/scrannotate`
-on macOS, `%LOCALAPPDATA%\scrannotate` on Windows. Untouched sizes stay
-resolution-scaled defaults.
+on macOS, `%LOCALAPPDATA%\scrannotate` on Windows. Untouched stroke/text
+sizes stay resolution-scaled defaults; the UI size has no such default and
+is always written.
 
 ## How it works
 
