@@ -146,18 +146,29 @@ pub fn apply_pixelate(img: &mut RgbaImage, rect: Rect, block: u32) {
         let mut bx = x0;
         while bx < x1 {
             let bw = block.min(x1 - bx);
+            // Average premultiplied colors so hidden RGB in transparent
+            // pixels cannot darken or tint the visible mosaic. Return straight
+            // RGBA for the shared display/export image buffer.
             let mut sum = [0u64; 3];
+            let mut alpha = 0_u64;
             for y in by..by + bh {
                 for x in bx..bx + bw {
                     let p = img.get_pixel(x, y).0;
-                    sum[0] += u64::from(p[0]);
-                    sum[1] += u64::from(p[1]);
-                    sum[2] += u64::from(p[2]);
+                    let a = u64::from(p[3]);
+                    sum[0] += u64::from(p[0]) * a;
+                    sum[1] += u64::from(p[1]) * a;
+                    sum[2] += u64::from(p[2]) * a;
+                    alpha += a;
                 }
             }
             let n = u64::from(bw) * u64::from(bh);
-            let channel = |s: u64| u8::try_from(s / n).unwrap_or(u8::MAX);
-            let avg = image::Rgba([channel(sum[0]), channel(sum[1]), channel(sum[2]), 255]);
+            let channel = |s: u64| u8::try_from(s / alpha.max(1)).unwrap_or(u8::MAX);
+            let avg = image::Rgba([
+                channel(sum[0]),
+                channel(sum[1]),
+                channel(sum[2]),
+                u8::try_from((alpha + n / 2) / n).unwrap_or(u8::MAX),
+            ]);
             for y in by..by + bh {
                 for x in bx..bx + bw {
                     img.put_pixel(x, y, avg);
@@ -193,4 +204,50 @@ pub fn pixelate_rects<'a>(annotations: impl IntoIterator<Item = &'a Annotation>)
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pixelation_preserves_transparency_and_ignores_hidden_colors() {
+        let mut img = RgbaImage::from_fn(4, 2, |x, _| match x {
+            0 => image::Rgba([255, 0, 0, 0]),
+            1 => image::Rgba([0, 0, 255, 255]),
+            _ => image::Rgba([90, 120, 180, 0]),
+        });
+        apply_pixelate(
+            &mut img,
+            Rect::from_min_max(Pos2::ZERO, Pos2::new(4.0, 2.0)),
+            2,
+        );
+        for y in 0..2 {
+            for x in 0..2 {
+                assert_eq!(*img.get_pixel(x, y), image::Rgba([0, 0, 255, 128]));
+            }
+            for x in 2..4 {
+                assert_eq!(*img.get_pixel(x, y), image::Rgba([0, 0, 0, 0]));
+            }
+        }
+    }
+
+    #[test]
+    fn opaque_pixelation_keeps_existing_average_and_region_bounds() {
+        let mut img = RgbaImage::from_fn(3, 2, |x, _| match x {
+            0 => image::Rgba([20, 40, 60, 255]),
+            1 => image::Rgba([31, 51, 71, 255]),
+            _ => image::Rgba([255, 0, 0, 255]),
+        });
+        apply_pixelate(
+            &mut img,
+            Rect::from_min_max(Pos2::ZERO, Pos2::new(2.0, 2.0)),
+            2,
+        );
+        for y in 0..2 {
+            assert_eq!(*img.get_pixel(0, y), image::Rgba([25, 45, 65, 255]));
+            assert_eq!(*img.get_pixel(1, y), image::Rgba([25, 45, 65, 255]));
+            assert_eq!(*img.get_pixel(2, y), image::Rgba([255, 0, 0, 255]));
+        }
+    }
 }
