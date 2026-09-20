@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 
 use eframe::egui::{
-    self, CentralPanel, Color32, ColorImage, Context, Key, KeyboardShortcut, Modifiers, Pos2,
-    Rect, TextureHandle, TextureOptions, Vec2, ViewportCommand,
+    self, CentralPanel, Color32, ColorImage, Context, Key, KeyboardShortcut, Modifiers, Pos2, Rect,
+    TextureHandle, TextureOptions, Vec2, ViewportCommand,
 };
 use image::RgbaImage;
 
@@ -16,7 +16,7 @@ use crate::annotate::{Annotation, Shape, Style, Tool, composite_pixelates, pixel
 use crate::document::Document;
 use crate::editor::{Editor, EscapeOutcome};
 use crate::ui::{TOOLS, canvas, text_overlay, toolbar};
-use crate::{clipboard, export, prefs};
+use crate::{clipboard, export, platform_files, prefs};
 
 /// Starter palette for first runs; at runtime the palette is a
 /// most-recently-used stack persisted via `prefs`.
@@ -82,7 +82,11 @@ impl ScreencapApp {
         let min_dim = img.width().min(img.height());
         // Default sizes scale with the screenshot so strokes stay legible on
         // HiDPI captures; deliberately-set (persisted) sizes win over that.
-        let saved = if demo_mode.is_some() { prefs::Prefs::default() } else { prefs::load() };
+        let saved = if demo_mode.is_some() {
+            prefs::Prefs::default()
+        } else {
+            prefs::load()
+        };
         let width = (f64::from(min_dim) / 450.0).clamp(2.0, 8.0).round();
         let stroke_width = saved.width.unwrap_or(width as f32);
         let font_size = saved.font_size.unwrap_or(stroke_width * 8.0);
@@ -97,7 +101,11 @@ impl ScreencapApp {
             // Initial state, not an edit: set directly, outside history.
             doc.region = Some(doc.image_rect());
         }
-        let style = Style { color, width: stroke_width, font_size };
+        let style = Style {
+            color,
+            width: stroke_width,
+            font_size,
+        };
         let editor = Editor::new(doc, style, palette, persist_style);
 
         let mut app = Self {
@@ -129,7 +137,11 @@ impl ScreencapApp {
     /// document places every tool's output on the synthetic desktop; the
     /// modes differ only in what is selected, mid-edit, or popped up.
     fn seed_demo(&mut self, mode: &str) {
-        let style = |color, width: f32, font_size: f32| Style { color, width, font_size };
+        let style = |color, width: f32, font_size: f32| Style {
+            color,
+            width,
+            font_size,
+        };
         let rect = |x0: f32, y0: f32, x1: f32, y1: f32| {
             Rect::from_min_max(Pos2::new(x0, y0), Pos2::new(x1, y1))
         };
@@ -148,27 +160,43 @@ impl ScreencapApp {
             style(blue, 4.0, 26.0),
         ));
         doc.push(Annotation::new(
-            Shape::Highlight { rect: rect(532.0, 276.0, 1180.0, 322.0) },
+            Shape::Highlight {
+                rect: rect(532.0, 276.0, 1180.0, 322.0),
+            },
             style(yellow, 5.0, 36.0),
         ));
         doc.push(Annotation::new(
-            Shape::Ellipse { rect: rect(880.0, 330.0, 1060.0, 392.0) },
+            Shape::Ellipse {
+                rect: rect(880.0, 330.0, 1060.0, 392.0),
+            },
             style(green, 5.0, 36.0),
         ));
         doc.push(Annotation::new(
-            Shape::Marker { pos: Pos2::new(492.0, 434.0), number: 2, target: None },
+            Shape::Marker {
+                pos: Pos2::new(492.0, 434.0),
+                number: 2,
+                target: None,
+            },
             style(blue, 4.0, 26.0),
         ));
         doc.push(Annotation::new(
-            Shape::Pixelate { rect: rect(532.0, 404.0, 1010.0, 464.0) },
+            Shape::Pixelate {
+                rect: rect(532.0, 404.0, 1010.0, 464.0),
+            },
             style(red, 5.0, 36.0),
         ));
         doc.push(Annotation::new(
-            Shape::Line { a: Pos2::new(540.0, 514.0), b: Pos2::new(1170.0, 514.0) },
+            Shape::Line {
+                a: Pos2::new(540.0, 514.0),
+                b: Pos2::new(1170.0, 514.0),
+            },
             style(blue, 5.0, 36.0),
         ));
         let text = doc.push(Annotation::new(
-            Shape::Text { pos: Pos2::new(560.0, 596.0), text: "Ship this build!".to_owned() },
+            Shape::Text {
+                pos: Pos2::new(560.0, 596.0),
+                text: "Ship this build!".to_owned(),
+            },
             style(red, 5.0, 44.0),
         ));
         // A hand-drawn wavy underline beneath the text.
@@ -178,13 +206,21 @@ impl ScreencapApp {
                 Pos2::new(x, 668.0 + 6.0 * (x / 18.0).sin())
             })
             .collect();
-        doc.push(Annotation::new(Shape::Pen { points }, style(green, 4.0, 36.0)));
+        doc.push(Annotation::new(
+            Shape::Pen { points },
+            style(green, 4.0, 36.0),
+        ));
         let arrow = doc.push(Annotation::new(
-            Shape::Arrow { a: Pos2::new(880.0, 560.0), b: Pos2::new(1090.0, 760.0) },
+            Shape::Arrow {
+                a: Pos2::new(880.0, 560.0),
+                b: Pos2::new(1090.0, 760.0),
+            },
             style(red, 5.0, 36.0),
         ));
         let boxed = doc.push(Annotation::new(
-            Shape::Rect { rect: rect(1108.0, 740.0, 1372.0, 850.0) },
+            Shape::Rect {
+                rect: rect(1108.0, 740.0, 1372.0, 850.0),
+            },
             style(red, 5.0, 36.0),
         ));
         doc.marker_next = 3;
@@ -225,10 +261,23 @@ impl ScreencapApp {
         if !self.prepare_export(ctx) {
             return;
         }
-        let result =
-            self.rendered().and_then(|img| export::save_timestamped(&img, &self.out_dir));
+        let result = self
+            .rendered()
+            .and_then(|img| platform_files::save_image(&img, &self.out_dir));
+        self.apply_save_result(ctx, close, result);
+    }
+
+    fn apply_save_result(
+        &mut self,
+        ctx: &Context,
+        close: bool,
+        result: anyhow::Result<Option<PathBuf>>,
+    ) {
         match result {
-            Ok(path) => {
+            Ok(Some(path)) => {
+                if let Some(directory) = path.parent() {
+                    self.out_dir = directory.to_owned();
+                }
                 println!("{}", path.display());
                 if close {
                     ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -236,7 +285,87 @@ impl ScreencapApp {
                     self.set_toast(ctx, format!("Saved {}", path.display()), false);
                 }
             }
+            Ok(None) => self.set_toast(ctx, "Save cancelled.", false),
             Err(err) => self.set_toast(ctx, format!("Save failed: {err:#}"), true),
+        }
+    }
+
+    #[cfg(any(windows, target_os = "macos", test))]
+    fn needs_open_confirmation(&self) -> bool {
+        self.editor.state.is_text_editing()
+            || self.editor.state.is_pointer_op()
+            || self.editor.doc.can_undo()
+            || self.editor.doc.can_redo()
+            || !self.editor.doc.annotations().is_empty()
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    fn open_image(&mut self, ctx: &Context) {
+        if self.needs_open_confirmation()
+            && rfd::MessageDialog::new()
+                .set_title("Open another image?")
+                .set_description("Opening another image will discard the current annotations and selection. Choose OK to select a PNG, or Cancel to keep editing. Your current image stays open if you cancel the file chooser.")
+                .set_level(rfd::MessageLevel::Warning)
+                .set_buttons(rfd::MessageButtons::OkCancel)
+                .show() != rfd::MessageDialogResult::Ok
+        {
+            self.restore_text_focus(ctx);
+            return;
+        }
+        self.apply_open_result(ctx, platform_files::open_image());
+        self.restore_text_focus(ctx);
+    }
+
+    #[cfg(any(windows, target_os = "macos", test))]
+    fn apply_open_result(&mut self, ctx: &Context, result: anyhow::Result<Option<RgbaImage>>) {
+        match result {
+            Ok(Some(image)) => {
+                let mut doc = Document::new(image);
+                doc.region = Some(doc.image_rect());
+                self.editor = Editor::new(
+                    doc,
+                    self.editor.style,
+                    self.editor.palette.clone(),
+                    self.editor.persist_style,
+                );
+                self.editor
+                    .view
+                    .fit(self.editor.doc.image_size(), self.last_canvas_size);
+                self.texture = None;
+                self.baked_pixelates.clear();
+                self.toolbar = toolbar::Toolbar::new(self.toolbar.ui_scale);
+                self.toast = None;
+                ctx.memory_mut(|memory| memory.stop_text_input());
+                ctx.request_repaint();
+            }
+            Ok(None) => {}
+            Err(error) => self.set_toast(ctx, format!("Open failed: {error:#}"), true),
+        }
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    fn choose_output_directory(&mut self, ctx: &Context) {
+        let result = platform_files::choose_output_directory(&self.out_dir);
+        match result {
+            Ok(Some(directory)) => {
+                self.set_toast(ctx, format!("Saving to {}", directory.display()), false);
+                self.out_dir = directory;
+            }
+            Ok(None) => {}
+            Err(error) => self.set_toast(
+                ctx,
+                format!("Could not change save folder: {error:#}"),
+                true,
+            ),
+        }
+        self.restore_text_focus(ctx);
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    fn restore_text_focus(&self, ctx: &Context) {
+        if self.editor.state.is_text_editing() {
+            // The inline editor uses this stable id to keep its caret state.
+            ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("text-editor-input")));
         }
     }
 
@@ -262,7 +391,11 @@ impl ScreencapApp {
     /// exists in the pointer state, not in the document being exported.
     fn prepare_export(&mut self, ctx: &Context) -> bool {
         if self.editor.state.is_pointer_op() {
-            self.set_toast(ctx, "Finish or cancel the current drag before saving or copying.", true);
+            self.set_toast(
+                ctx,
+                "Finish or cancel the current drag before saving or copying.",
+                true,
+            );
             return false;
         }
         self.editor.commit_text();
@@ -273,11 +406,16 @@ impl ScreencapApp {
     /// Its local editing shortcuts stay with the widget; application lifecycle
     /// commands still work while the caret is active.
     fn handle_text_lifecycle_shortcuts(&mut self, ctx: &Context) {
-        if ctx.memory(|m| m.top_modal_layer().is_some()) {
-            return;
+        match self.text_lifecycle_action(ctx) {
+            Some(toolbar::ToolbarAction::Save { close }) => self.save(ctx, close),
+            Some(toolbar::ToolbarAction::Close) => ctx.send_viewport_cmd(ViewportCommand::Close),
+            _ => {}
         }
-        if !self.editor.state.is_text_editing() {
-            return;
+    }
+
+    fn text_lifecycle_action(&self, ctx: &Context) -> Option<toolbar::ToolbarAction> {
+        if ctx.memory(|m| m.top_modal_layer().is_some()) || !self.editor.state.is_text_editing() {
+            return None;
         }
         let (save, quit) = ctx.input_mut(|i| {
             let command = |key| KeyboardShortcut::new(Modifiers::COMMAND, key);
@@ -287,9 +425,11 @@ impl ScreencapApp {
             )
         });
         if save {
-            self.save(ctx, true);
+            Some(toolbar::ToolbarAction::Save { close: true })
         } else if quit {
-            ctx.send_viewport_cmd(ViewportCommand::Close);
+            Some(toolbar::ToolbarAction::Close)
+        } else {
+            None
         }
     }
 
@@ -312,8 +452,11 @@ impl ScreencapApp {
         let (w, h) = composited.dimensions();
         if w > max_side || h > max_side {
             let long = u64::from(w.max(h));
-            let scaled =
-                |d: u32| u32::try_from(u64::from(d) * u64::from(max_side) / long).unwrap_or(1).max(1);
+            let scaled = |d: u32| {
+                u32::try_from(u64::from(d) * u64::from(max_side) / long)
+                    .unwrap_or(1)
+                    .max(1)
+            };
             composited = image::imageops::resize(
                 &composited,
                 scaled(w),
@@ -382,7 +525,10 @@ impl ScreencapApp {
                         }
                     }
                 }
-                (save, copy, undo, redo, quit, fit, escape, reset, delete, select_all, space, tool)
+                (
+                    save, copy, undo, redo, quit, fit, escape, reset, delete, select_all, space,
+                    tool,
+                )
             });
         if let Some(tool) = tool {
             self.editor.set_tool(tool);
@@ -402,7 +548,9 @@ impl ScreencapApp {
             self.editor.undo();
         }
         if fit {
-            self.editor.view.fit(self.editor.doc.image_size(), canvas_size);
+            self.editor
+                .view
+                .fit(self.editor.doc.image_size(), canvas_size);
         }
         if reset {
             self.editor.reset_all();
@@ -449,7 +597,9 @@ impl ScreencapApp {
         if self.demo {
             return; // demo runs windowed for deterministic screenshots
         }
-        let Some(win) = frame.winit_window() else { return };
+        let Some(win) = frame.winit_window() else {
+            return;
+        };
         let target = self.capture_display.take();
 
         #[cfg(any(windows, target_os = "linux"))]
@@ -485,8 +635,9 @@ impl ScreencapApp {
             use winit::platform::macos::{MonitorHandleExtMacOS, WindowExtMacOS};
             if let Some(target) = target
                 && let Ok(display_id) = target.id.parse::<u32>()
-                && let Some(monitor) =
-                    win.available_monitors().find(|m| m.native_id() == display_id)
+                && let Some(monitor) = win
+                    .available_monitors()
+                    .find(|m| m.native_id() == display_id)
             {
                 win.set_outer_position(monitor.position());
             }
@@ -571,9 +722,9 @@ impl eframe::App for ScreencapApp {
 
         self.handle_shortcuts(ctx, self.last_canvas_size);
 
-        CentralPanel::default().frame(egui::Frame::NONE.fill(Color32::BLACK)).show(
-            root,
-            |ui| {
+        CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(Color32::BLACK))
+            .show(root, |ui| {
                 let canvas = canvas::show(ui, &mut self.editor, self.texture.as_ref());
                 self.last_canvas_size = canvas.size();
 
@@ -587,7 +738,10 @@ impl eframe::App for ScreencapApp {
                     is_error: t.is_error,
                 });
 
-                match self.toolbar.show(ctx, &mut self.editor, canvas, status_override) {
+                match self
+                    .toolbar
+                    .show(ctx, &mut self.editor, canvas, status_override)
+                {
                     // The click landed on the toolbar, not the canvas, so
                     // an open text edit hasn't committed yet — what's
                     // exported must be what's on screen.
@@ -602,6 +756,12 @@ impl eframe::App for ScreencapApp {
                     Some(toolbar::ToolbarAction::Close) => {
                         ctx.send_viewport_cmd(ViewportCommand::Close);
                     }
+                    #[cfg(any(windows, target_os = "macos"))]
+                    Some(toolbar::ToolbarAction::OpenImage) => self.open_image(ctx),
+                    #[cfg(any(windows, target_os = "macos"))]
+                    Some(toolbar::ToolbarAction::ChooseOutputDirectory) => {
+                        self.choose_output_directory(ctx)
+                    }
                     None => {}
                 }
                 // Ctrl+C with nothing selected and the caret at the end is
@@ -609,14 +769,13 @@ impl eframe::App for ScreencapApp {
                 // outside the editor, with the text on screen included.
                 if !ctx.memory(|m| m.top_modal_layer().is_some())
                     && let Some(text_overlay::TextEditAction::CopyAndClose) =
-                    text_overlay::show(ctx, &mut self.editor, canvas)
+                        text_overlay::show(ctx, &mut self.editor, canvas)
                 {
                     self.editor.commit_text();
                     self.copy(ctx, true);
                 }
                 self.handle_text_lifecycle_shortcuts(ctx);
-            },
-        );
+            });
 
         // set_simple_fullscreen takes effect after the first layout. Make
         // the next layouts fit the capture to the resized fullscreen canvas.
@@ -649,7 +808,11 @@ mod tests {
     }
 
     fn command_input(key: Key) -> egui::RawInput {
-        let modifiers = Modifiers { command: true, ctrl: true, ..Modifiers::NONE };
+        let modifiers = Modifiers {
+            command: true,
+            ctrl: true,
+            ..Modifiers::NONE
+        };
         egui::RawInput {
             modifiers,
             events: vec![egui::Event::Key {
@@ -678,7 +841,10 @@ mod tests {
         assert_eq!(app.editor.doc.shapes().count(), 0);
         assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
         assert!(!output.viewport_output.values().any(|viewport| {
-            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+            viewport
+                .commands
+                .iter()
+                .any(|command| matches!(command, ViewportCommand::Close))
         }));
     }
 
@@ -691,7 +857,18 @@ mod tests {
         app.out_dir = std::env::current_exe().expect("test executable");
         let ctx = Context::default();
         let output = ctx.run_ui(command_input(Key::S), |_| {
-            app.handle_text_lifecycle_shortcuts(&ctx);
+            let Some(toolbar::ToolbarAction::Save { close }) = app.text_lifecycle_action(&ctx)
+            else {
+                panic!("Save shortcut must remain available while typing");
+            };
+            assert!(app.prepare_export(&ctx));
+            // Exercise the same write failure without invoking a native
+            // authorization panel in mac-app-store CI builds.
+            let result = app
+                .rendered()
+                .and_then(|image| export::save_timestamped(&image, &app.out_dir))
+                .map(Some);
+            app.apply_save_result(&ctx, close, result);
         });
         assert!(!app.editor.state.is_text_editing());
         assert!(app.editor.doc.shapes().any(|annotation| {
@@ -699,8 +876,132 @@ mod tests {
         }));
         assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
         assert!(!output.viewport_output.values().any(|viewport| {
-            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+            viewport
+                .commands
+                .iter()
+                .any(|command| matches!(command, ViewportCommand::Close))
         }));
+    }
+
+    #[test]
+    fn cancelled_save_keeps_the_editor_open() {
+        let mut app = app();
+        edit_text(&mut app);
+        let original = app.editor.doc.base.clone();
+        let ctx = Context::default();
+        let output = ctx.run_ui(Default::default(), |_| {
+            assert!(app.prepare_export(&ctx));
+            app.apply_save_result(&ctx, true, Ok(None));
+        });
+        assert_eq!(app.editor.doc.base, original);
+        assert!(app.editor.doc.shapes().any(|annotation| {
+            matches!(&annotation.shape, Shape::Text { text, .. } if text == "Keep this text")
+        }));
+        assert!(
+            app.toast
+                .as_ref()
+                .is_some_and(|toast| !toast.is_error && toast.message == "Save cancelled.")
+        );
+        assert!(!output.viewport_output.values().any(|viewport| {
+            viewport
+                .commands
+                .iter()
+                .any(|command| matches!(command, ViewportCommand::Close))
+        }));
+    }
+
+    #[test]
+    fn cancelled_or_failed_open_preserves_the_current_document_and_text() {
+        let mut app = app();
+        app.editor
+            .doc
+            .base
+            .put_pixel(0, 0, image::Rgba([5, 10, 15, 255]));
+        app.editor.view.pan_by(Vec2::new(17.0, 23.0));
+        edit_text(&mut app);
+        let original = app.editor.doc.base.clone();
+        let original_region = app.editor.doc.region;
+        let original_style = app.editor.style;
+        let ctx = Context::default();
+        for result in [Ok(None), Err(anyhow::anyhow!("damaged PNG"))] {
+            app.apply_open_result(&ctx, result);
+            assert_eq!(app.editor.doc.base, original);
+            assert_eq!(app.editor.doc.region, original_region);
+            assert_eq!(app.editor.style, original_style);
+            assert_eq!(app.editor.view.pan, Vec2::new(17.0, 23.0));
+            let EditorState::TextEditing(edit) = &app.editor.state else {
+                panic!("Opening did not succeed, so the in-progress text must remain");
+            };
+            assert_eq!(edit.buffer, "Keep this text");
+        }
+        assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
+    }
+
+    #[test]
+    fn opening_requires_confirmation_for_edits_and_active_interactions() {
+        let mut app = app();
+        assert!(!app.needs_open_confirmation());
+        edit_text(&mut app);
+        assert!(app.needs_open_confirmation());
+        app.editor.state = EditorState::DrawingShape {
+            start: Pos2::ZERO,
+            current: Pos2::new(40.0, 40.0),
+            points: vec![],
+        };
+        assert!(app.needs_open_confirmation());
+        app.editor.state = EditorState::Idle;
+        app.editor.doc.begin();
+        app.editor.doc.region = Some(Rect::from_min_size(Pos2::ZERO, Vec2::splat(10.0)));
+        app.editor.doc.commit();
+        assert!(
+            app.needs_open_confirmation(),
+            "changed capture region must be confirmed"
+        );
+    }
+
+    #[test]
+    fn successful_open_resets_document_and_texture_but_keeps_style_preferences() {
+        let mut app = app();
+        app.editor.style = Style {
+            color: Color32::BLUE,
+            width: 9.0,
+            font_size: 44.0,
+        };
+        app.editor.palette = vec![Color32::BLUE, Color32::GREEN];
+        app.editor.persist_style = true;
+        let style = app.editor.style;
+        let palette = app.editor.palette.clone();
+        app.editor.doc.begin();
+        let annotation = app.editor.doc.push(Annotation::new(
+            Shape::Pixelate {
+                rect: Rect::from_min_size(Pos2::ZERO, Vec2::splat(15.0)),
+            },
+            style,
+        ));
+        app.editor.doc.commit();
+        app.editor.selected.insert(annotation);
+        app.editor.view.pan_by(Vec2::new(100.0, 50.0));
+        edit_text(&mut app);
+        let ctx = Context::default();
+        let _ = ctx.run_ui(Default::default(), |_| app.sync_texture(&ctx));
+        assert!(app.texture.is_some());
+        assert!(!app.baked_pixelates.is_empty());
+        let new_image = RgbaImage::from_pixel(30, 20, image::Rgba([40, 80, 120, 255]));
+        app.apply_open_result(&ctx, Ok(Some(new_image.clone())));
+        assert_eq!(app.editor.doc.base, new_image);
+        assert_eq!(app.editor.doc.region, Some(app.editor.doc.image_rect()));
+        assert!(app.editor.doc.annotations().is_empty());
+        assert!(!app.editor.doc.can_undo());
+        assert!(!app.editor.doc.can_redo());
+        assert!(app.editor.selected.is_empty());
+        assert!(app.editor.state.is_idle());
+        assert_eq!(app.editor.tool, Tool::Select);
+        assert!(app.editor.view.fitted);
+        assert_eq!(app.editor.style, style);
+        assert_eq!(app.editor.palette, palette);
+        assert!(app.editor.persist_style);
+        assert!(app.texture.is_none());
+        assert!(app.baked_pixelates.is_empty());
     }
 
     #[test]
@@ -712,7 +1013,10 @@ mod tests {
             app.handle_text_lifecycle_shortcuts(&ctx);
         });
         assert!(output.viewport_output.values().any(|viewport| {
-            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+            viewport
+                .commands
+                .iter()
+                .any(|command| matches!(command, ViewportCommand::Close))
         }));
     }
 }

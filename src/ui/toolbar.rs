@@ -17,9 +17,17 @@ use crate::ui::{
 /// Actions the toolbar can't perform itself (they need export/clipboard/
 /// viewport access); the app layer executes them.
 pub enum ToolbarAction {
-    Copy { close: bool },
-    Save { close: bool },
+    Copy {
+        close: bool,
+    },
+    Save {
+        close: bool,
+    },
     Close,
+    #[cfg(any(windows, target_os = "macos"))]
+    OpenImage,
+    #[cfg(any(windows, target_os = "macos"))]
+    ChooseOutputDirectory,
 }
 
 /// An app-level message that overrides the editor's status line (save/copy
@@ -63,6 +71,7 @@ impl Toolbar {
         canvas: Rect,
         status_override: Option<StatusOverride>,
     ) -> Option<ToolbarAction> {
+        let mut action = self.show_file_actions(ctx, canvas);
         self.about.show(ctx, canvas);
         // Keep initial selection unobstructed, but never hide errors or
         // the discard confirmation just because there is no region yet.
@@ -84,9 +93,15 @@ impl Toolbar {
                         show_status(ui, &status, scale, 0.0, canvas.height() * 0.4);
                     });
             }
-            return None;
+            return action;
         };
-        let mut action = None;
+        // Keep desktop file actions above the toolbar, including when the
+        // selected region begins at the top-left corner of the screen.
+        let toolbar_canvas = if cfg!(any(windows, target_os = "macos")) {
+            Rect::from_min_max(canvas.min + Vec2::new(0.0, 48.0), canvas.max)
+        } else {
+            canvas
+        };
         let status = status_line(editor, status_override.as_ref());
         let margin = 12.0;
         let size = self.size;
@@ -100,8 +115,8 @@ impl Toolbar {
             };
             Pos2::new(x, ss.min.y)
         };
-        let lo = canvas.min;
-        let hi = (canvas.max - size).max(lo);
+        let lo = toolbar_canvas.min;
+        let hi = (toolbar_canvas.max - size).max(lo);
         let pos = self.pos.unwrap_or(default_pos).clamp(lo, hi);
         // Every size in the panel derives from this one factor, so Small,
         // Medium, and Large stay proportional instead of drifting apart.
@@ -112,10 +127,11 @@ impl Toolbar {
         let area = egui::Area::new(Id::new("toolbar"))
             .fixed_pos(pos)
             .order(egui::Order::Foreground)
-            .constrain_to(canvas)
+            .constrain_to(toolbar_canvas)
             .show(ctx, |ui| {
                 let frame = egui::Frame::popup(ui.style());
-                let content_size = canvas.size() - frame.total_margin().sum() - Vec2::splat(4.0);
+                let content_size =
+                    toolbar_canvas.size() - frame.total_margin().sum() - Vec2::splat(4.0);
                 frame.show(ui, |ui| {
                     let toolbar_w = toolbar_w.min(content_size.x.max(1.0));
                     ui.set_width(toolbar_w);
@@ -511,6 +527,37 @@ impl Toolbar {
         self.size = area.response.rect.size();
         action
     }
+
+    fn show_file_actions(&self, ctx: &Context, canvas: Rect) -> Option<ToolbarAction> {
+        #[cfg(any(windows, target_os = "macos"))]
+        {
+            let mut action = None;
+            egui::Area::new(Id::new("native-file-actions"))
+                .anchor(Align2::LEFT_TOP, Vec2::new(12.0, 12.0))
+                .constrain_to(canvas)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        let open = ui.button("Open PNG…");
+                        if open.clicked() {
+                            open.surrender_focus();
+                            action = Some(ToolbarAction::OpenImage);
+                        }
+                        let folder = ui.button("Save folder…");
+                        if folder.clicked() {
+                            folder.surrender_focus();
+                            action = Some(ToolbarAction::ChooseOutputDirectory);
+                        }
+                    });
+                });
+            action
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
+        {
+            let _ = (ctx, canvas);
+            None
+        }
+    }
 }
 
 /// What the status footer shows: only a genuine alert (the discard
@@ -750,6 +797,54 @@ mod tests {
         assert!(
             visible_text(&output, "Cancel").is_some(),
             "cancellation is clipped"
+        );
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    #[test]
+    fn native_file_actions_are_available_before_region_selection() {
+        let ctx = Context::default();
+        let mut toolbar = Toolbar::new(UiScale::default());
+        let mut editor = editor();
+        for _ in 0..3 {
+            frame(&ctx, &mut toolbar, &mut editor, vec![], None);
+        }
+        let (output, _) = frame(&ctx, &mut toolbar, &mut editor, vec![], None);
+        let open = visible_text(&output, "Open PNG…").expect("Open is available without a region");
+        assert!(visible_text(&output, "Save folder…").is_some());
+        let (_, action) = frame(
+            &ctx,
+            &mut toolbar,
+            &mut editor,
+            vec![
+                Event::PointerMoved(open.center()),
+                Event::PointerButton {
+                    pos: open.center(),
+                    button: PointerButton::Primary,
+                    pressed: true,
+                    modifiers: Modifiers::NONE,
+                },
+                Event::PointerButton {
+                    pos: open.center(),
+                    button: PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+            None,
+        );
+        assert!(matches!(action, Some(ToolbarAction::OpenImage)));
+        editor.doc.region = Some(editor.doc.image_rect());
+        for _ in 0..3 {
+            frame(&ctx, &mut toolbar, &mut editor, vec![], None);
+        }
+        let toolbar_rect = ctx.memory(|m| m.area_rect(Id::new("toolbar"))).unwrap();
+        let files_rect = ctx
+            .memory(|m| m.area_rect(Id::new("native-file-actions")))
+            .unwrap();
+        assert!(
+            !toolbar_rect.intersects(files_rect),
+            "toolbar must not cover file actions"
         );
     }
 
