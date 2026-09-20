@@ -210,6 +210,7 @@ impl ScreencapApp {
             until: ctx.input(|i| i.time) + 5.0,
             is_error,
         });
+        ctx.request_repaint_after(std::time::Duration::from_secs(5));
     }
 
     /// The region (or the whole frame when nothing is selected) with
@@ -221,6 +222,9 @@ impl ScreencapApp {
 
     /// Save the region; optionally quit. On failure stay open either way.
     fn save(&mut self, ctx: &Context, close: bool) {
+        if !self.prepare_export(ctx) {
+            return;
+        }
         let result =
             self.rendered().and_then(|img| export::save_timestamped(&img, &self.out_dir));
         match result {
@@ -239,6 +243,9 @@ impl ScreencapApp {
     /// Copy the region to the clipboard; optionally quit. On failure stay
     /// open either way.
     fn copy(&mut self, ctx: &Context, close: bool) {
+        if !self.prepare_export(ctx) {
+            return;
+        }
         match self.rendered().and_then(|img| clipboard::copy_image(&img)) {
             Ok(()) => {
                 if close {
@@ -248,6 +255,41 @@ impl ScreencapApp {
                 }
             }
             Err(err) => self.set_toast(ctx, format!("Copy failed: {err:#}"), true),
+        }
+    }
+
+    /// Export only completed interactions. In particular, an unfinished blur
+    /// exists in the pointer state, not in the document being exported.
+    fn prepare_export(&mut self, ctx: &Context) -> bool {
+        if self.editor.state.is_pointer_op() {
+            self.set_toast(ctx, "Finish or cancel the current drag before saving or copying.", true);
+            return false;
+        }
+        self.editor.commit_text();
+        true
+    }
+
+    /// TextEdit must process this frame's text input before Save commits it.
+    /// Its local editing shortcuts stay with the widget; application lifecycle
+    /// commands still work while the caret is active.
+    fn handle_text_lifecycle_shortcuts(&mut self, ctx: &Context) {
+        if ctx.memory(|m| m.top_modal_layer().is_some()) {
+            return;
+        }
+        if !self.editor.state.is_text_editing() {
+            return;
+        }
+        let (save, quit) = ctx.input_mut(|i| {
+            let command = |key| KeyboardShortcut::new(Modifiers::COMMAND, key);
+            (
+                i.consume_shortcut(&command(Key::S)),
+                i.consume_shortcut(&command(Key::Q)) || i.consume_shortcut(&command(Key::W)),
+            )
+        });
+        if save {
+            self.save(ctx, true);
+        } else if quit {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
         }
     }
 
@@ -292,6 +334,9 @@ impl ScreencapApp {
     }
 
     fn handle_shortcuts(&mut self, ctx: &Context, canvas_size: Vec2) {
+        if ctx.memory(|m| m.top_modal_layer().is_some()) {
+            return;
+        }
         // The inline text editor owns the keyboard completely.
         if self.editor.state.is_text_editing() {
             return;
@@ -562,12 +607,14 @@ impl eframe::App for ScreencapApp {
                 // Ctrl+C with nothing selected and the caret at the end is
                 // not a text operation — it means the same thing it does
                 // outside the editor, with the text on screen included.
-                if let Some(text_overlay::TextEditAction::CopyAndClose) =
+                if !ctx.memory(|m| m.top_modal_layer().is_some())
+                    && let Some(text_overlay::TextEditAction::CopyAndClose) =
                     text_overlay::show(ctx, &mut self.editor, canvas)
                 {
                     self.editor.commit_text();
                     self.copy(ctx, true);
                 }
+                self.handle_text_lifecycle_shortcuts(ctx);
             },
         );
 
@@ -579,5 +626,93 @@ impl eframe::App for ScreencapApp {
             self.editor.view.fitted = false;
             ctx.request_repaint();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::editor::state::{EditorState, TextEditState};
+
+    fn app() -> ScreencapApp {
+        ScreencapApp::new(RgbaImage::new(200, 120), PathBuf::new(), true, None, None)
+    }
+
+    fn edit_text(app: &mut ScreencapApp) {
+        app.editor.state = EditorState::TextEditing(TextEditState {
+            target: None,
+            pos: Pos2::new(10.0, 10.0),
+            buffer: "Keep this text".into(),
+            style: app.editor.style,
+            just_created: false,
+        });
+    }
+
+    fn command_input(key: Key) -> egui::RawInput {
+        let modifiers = Modifiers { command: true, ctrl: true, ..Modifiers::NONE };
+        egui::RawInput {
+            modifiers,
+            events: vec![egui::Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers,
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn export_rejects_unfinished_blur_without_closing_or_committing() {
+        let mut app = app();
+        app.editor.tool = Tool::Pixelate;
+        app.editor.state = EditorState::DrawingShape {
+            start: Pos2::ZERO,
+            current: Pos2::new(50.0, 50.0),
+            points: Vec::new(),
+        };
+        let ctx = Context::default();
+        let output = ctx.run_ui(Default::default(), |_| app.save(&ctx, true));
+        assert!(app.editor.state.is_pointer_op());
+        assert_eq!(app.editor.doc.shapes().count(), 0);
+        assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
+        assert!(!output.viewport_output.values().any(|viewport| {
+            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+        }));
+    }
+
+    #[test]
+    fn save_shortcut_commits_text_and_keeps_editor_open_on_failure() {
+        let mut app = app();
+        edit_text(&mut app);
+        // The test executable is a file, so it cannot be created as an output
+        // directory. No writes occur; failure must preserve the text.
+        app.out_dir = std::env::current_exe().expect("test executable");
+        let ctx = Context::default();
+        let output = ctx.run_ui(command_input(Key::S), |_| {
+            app.handle_text_lifecycle_shortcuts(&ctx);
+        });
+        assert!(!app.editor.state.is_text_editing());
+        assert!(app.editor.doc.shapes().any(|annotation| {
+            matches!(&annotation.shape, Shape::Text { text, .. } if text == "Keep this text")
+        }));
+        assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
+        assert!(!output.viewport_output.values().any(|viewport| {
+            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+        }));
+    }
+
+    #[test]
+    fn quit_shortcut_works_during_text_editing() {
+        let mut app = app();
+        edit_text(&mut app);
+        let ctx = Context::default();
+        let output = ctx.run_ui(command_input(Key::Q), |_| {
+            app.handle_text_lifecycle_shortcuts(&ctx);
+        });
+        assert!(output.viewport_output.values().any(|viewport| {
+            viewport.commands.iter().any(|command| matches!(command, ViewportCommand::Close))
+        }));
     }
 }

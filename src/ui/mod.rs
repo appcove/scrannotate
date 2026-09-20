@@ -1,6 +1,7 @@
 //! egui front-end: translates input into editor calls and paints the
 //! canvas, toolbar, color picker, and inline text editor.
 
+pub mod about;
 pub mod canvas;
 pub mod color_picker;
 pub mod paint;
