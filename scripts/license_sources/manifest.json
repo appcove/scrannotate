@@ -1,0 +1,1043 @@
+{
+  "accesskit@0.24.1": {
+    "repository": "AccessKit/accesskit",
+    "revision": "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
+    "crate_path": "common",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_atspi_common@0.18.1": {
+    "repository": "AccessKit/accesskit",
+    "revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+    "crate_path": "platforms/atspi-common",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_consumer@0.35.0": {
+    "repository": "AccessKit/accesskit",
+    "revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+    "crate_path": "consumer",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_consumer@0.36.0": {
+    "repository": "AccessKit/accesskit",
+    "revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+    "crate_path": "consumer",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_consumer@0.37.0": {
+    "repository": "AccessKit/accesskit",
+    "revision": "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
+    "crate_path": "consumer",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_macos@0.26.2": {
+    "repository": "AccessKit/accesskit",
+    "revision": "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
+    "crate_path": "platforms/macos",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_unix@0.21.1": {
+    "repository": "AccessKit/accesskit",
+    "revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+    "crate_path": "platforms/unix",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_f40dfc01a0c0/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_windows@0.32.1": {
+    "repository": "AccessKit/accesskit",
+    "revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+    "crate_path": "platforms/windows",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_winit@0.32.2": {
+    "repository": "AccessKit/accesskit",
+    "revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+    "crate_path": "platforms/winit",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_1bbcf100942b/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-MIT"
+      }
+    ]
+  },
+  "block2@0.5.1": {
+    "repository": "madsmtm/objc2",
+    "revision": "4fc083f1c6d6784577e38b0ee8dbd344481e2fd2",
+    "crate_path": "crates/block2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_4fc083f1c6d6/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/4fc083f1c6d6784577e38b0ee8dbd344481e2fd2/LICENSE.txt"
+      }
+    ]
+  },
+  "block2@0.6.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "b4167b582b2f75f9a1be75495c41b765344fd03c",
+    "crate_path": "crates/block2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_b4167b582b2f/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "clipboard-win@5.4.1": {
+    "repository": "DoumanAsh/clipboard-win",
+    "revision": "3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342",
+    "crate_path": "",
+    "license": "BSL-1.0",
+    "files": [
+      {
+        "file": "DoumanAsh_clipboard-win_3b27cf2bfd1a/LICENSE",
+        "url": "https://raw.githubusercontent.com/DoumanAsh/clipboard-win/3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342/LICENSE"
+      }
+    ]
+  },
+  "cookie-factory@0.3.3": {
+    "repository": "rust-bakery/cookie-factory",
+    "revision": "d36b805dbd7dd65f2df947235c5bcc573afe2c76",
+    "crate_path": "",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "rust-bakery_cookie-factory_d36b805dbd7d/MIT.txt",
+        "url": "https://raw.githubusercontent.com/rust-bakery/cookie-factory/d36b805dbd7dd65f2df947235c5bcc573afe2c76/LICENSES/MIT.txt"
+      }
+    ]
+  },
+  "dispatch2@0.3.1": {
+    "repository": "madsmtm/objc2",
+    "revision": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+    "crate_path": "crates/dispatch2",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_8852b424193c/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "dispatch@0.2.0": {
+    "repository": "SSheldon/rust-dispatch",
+    "revision": "82d6c7a5b75dc0c71c3f46f87bb6c16a476f7748",
+    "crate_path": "",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      }
+    ],
+    "notes": "The published crate and its source revision declare MIT but contain no license text. This is the canonical SPDX text for the explicitly declared license; see the crate manifest for author attribution. No copyright owner or year is inferred.",
+    "omit_spdx_copyright_template": true
+  },
+  "ecolor@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/ecolor",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "eframe@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/eframe",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui-wgpu@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/egui-wgpu",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui-winit@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/egui-winit",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/egui",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui_glow@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/egui_glow",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "emath@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/emath",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "epaint@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/epaint",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "epaint_default_fonts@0.35.0": {
+    "repository": "emilk/egui",
+    "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+    "crate_path": "crates/epaint_default_fonts",
+    "license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+    "files": [
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "gpu-descriptor-types@0.2.0": {
+    "repository": "zakarumych/gpu-descriptor",
+    "revision": "9f2fb9546591322e7b77ee1e79385e01effd85e4",
+    "crate_path": "types",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "zakarumych_gpu-descriptor_9f2fb9546591/COPYING",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/9f2fb9546591322e7b77ee1e79385e01effd85e4/COPYING"
+      },
+      {
+        "file": "zakarumych_gpu-descriptor_9f2fb9546591/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/APACHE"
+      },
+      {
+        "file": "zakarumych_gpu-descriptor_9f2fb9546591/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/MIT"
+      }
+    ]
+  },
+  "gpu-descriptor@0.3.2": {
+    "repository": "zakarumych/gpu-descriptor",
+    "revision": "bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a",
+    "crate_path": "gpu-descriptor",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "zakarumych_gpu-descriptor_bb28b4e55b74/COPYING",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/COPYING"
+      },
+      {
+        "file": "zakarumych_gpu-descriptor_bb28b4e55b74/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/APACHE"
+      },
+      {
+        "file": "zakarumych_gpu-descriptor_bb28b4e55b74/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/MIT"
+      }
+    ]
+  },
+  "harfrust@0.7.0": {
+    "repository": "harfbuzz/harfrust",
+    "revision": "10b48dd84651c126e8f42457a8f400b38da347ea",
+    "crate_path": "harfrust",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "harfbuzz_harfrust_10b48dd84651/LICENSE",
+        "url": "https://raw.githubusercontent.com/harfbuzz/harfrust/10b48dd84651c126e8f42457a8f400b38da347ea/LICENSE"
+      }
+    ]
+  },
+  "hexf-parse@0.2.1": {
+    "repository": "lifthrasiir/hexf",
+    "revision": "4225763d744183d720f575ae96d04161b4d08ea0",
+    "crate_path": "",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "file": "spdx_d46e94e2c78c/CC0-1.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/CC0-1.0.txt"
+      }
+    ],
+    "notes": "The published crate and its source revision declare CC0-1.0 but contain no license text. This is the canonical SPDX text for the explicitly declared license; see the crate manifest for author attribution. No copyright owner or year is inferred."
+  },
+  "objc-sys@0.3.5": {
+    "repository": "madsmtm/objc2",
+    "revision": "4fc083f1c6d6784577e38b0ee8dbd344481e2fd2",
+    "crate_path": "crates/objc-sys",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_4fc083f1c6d6/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/4fc083f1c6d6784577e38b0ee8dbd344481e2fd2/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-app-kit@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-app-kit",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-app-kit@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-app-kit",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-av-foundation@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-av-foundation",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-audio-types@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-audio-types",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-audio@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-audio",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-data@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-core-data",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-core-foundation@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-foundation",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-graphics@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-graphics",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-image@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-core-image",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-core-media@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-media",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-core-video@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-core-video",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-encode@4.1.0": {
+    "repository": "madsmtm/objc2",
+    "revision": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+    "crate_path": "crates/objc2-encode",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_8d214f547736/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-foundation@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-foundation",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-foundation@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-foundation",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-io-surface@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-io-surface",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-metal@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-metal",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-metal@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-metal",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-quartz-core@0.2.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "e282618be4c3a3b9542957e0c8540e9588472ce8",
+    "crate_path": "framework-crates/objc2-quartz-core",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_e282618be4c3/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2-quartz-core@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-quartz-core",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-screen-capture-kit@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-screen-capture-kit",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2-uniform-type-identifiers@0.3.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "crate_path": "framework-crates/objc2-uniform-type-identifiers",
+    "license": "Zlib OR Apache-2.0 OR MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_7b1abfd750a2/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Zlib.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Zlib.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "objc2@0.5.2": {
+    "repository": "madsmtm/objc2",
+    "revision": "4fc083f1c6d6784577e38b0ee8dbd344481e2fd2",
+    "crate_path": "crates/objc2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_4fc083f1c6d6/LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/4fc083f1c6d6784577e38b0ee8dbd344481e2fd2/LICENSE.txt"
+      }
+    ]
+  },
+  "objc2@0.6.4": {
+    "repository": "madsmtm/objc2",
+    "revision": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+    "crate_path": "crates/objc2",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "madsmtm_objc2_8852b424193c/LICENSE.md",
+        "url": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      }
+    ],
+    "omit_spdx_copyright_template": true,
+    "notes": "The upstream license document declares the applicable licenses by linking to their canonical terms. The matching SPDX texts are included here. No copyright owner or year is inferred."
+  },
+  "pinray-core@0.2.4": {
+    "repository": "Itz-Agasta/pinray",
+    "revision": "86097238059f38dd9f8d818bd6a513e7300aa9a2",
+    "crate_path": "crates/core",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "Itz-Agasta_pinray_86097238059f/LICENSE",
+        "url": "https://raw.githubusercontent.com/Itz-Agasta/pinray/86097238059f38dd9f8d818bd6a513e7300aa9a2/LICENSE"
+      }
+    ]
+  },
+  "pinray-platform-linux@0.2.4": {
+    "repository": "Itz-Agasta/pinray",
+    "revision": "86097238059f38dd9f8d818bd6a513e7300aa9a2",
+    "crate_path": "crates/platform-linux",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "Itz-Agasta_pinray_86097238059f/LICENSE",
+        "url": "https://raw.githubusercontent.com/Itz-Agasta/pinray/86097238059f38dd9f8d818bd6a513e7300aa9a2/LICENSE"
+      }
+    ]
+  },
+  "pinray-platform-macos@0.2.4": {
+    "repository": "Itz-Agasta/pinray",
+    "revision": "86097238059f38dd9f8d818bd6a513e7300aa9a2",
+    "crate_path": "crates/platform-macos",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "Itz-Agasta_pinray_86097238059f/LICENSE",
+        "url": "https://raw.githubusercontent.com/Itz-Agasta/pinray/86097238059f38dd9f8d818bd6a513e7300aa9a2/LICENSE"
+      }
+    ]
+  },
+  "pinray-platform-windows@0.2.4": {
+    "repository": "Itz-Agasta/pinray",
+    "revision": "86097238059f38dd9f8d818bd6a513e7300aa9a2",
+    "crate_path": "crates/platform-windows",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "Itz-Agasta_pinray_86097238059f/LICENSE",
+        "url": "https://raw.githubusercontent.com/Itz-Agasta/pinray/86097238059f38dd9f8d818bd6a513e7300aa9a2/LICENSE"
+      }
+    ]
+  },
+  "pinray@0.2.4": {
+    "repository": "Itz-Agasta/pinray",
+    "revision": "86097238059f38dd9f8d818bd6a513e7300aa9a2",
+    "crate_path": "crates/pinray",
+    "license": "MIT",
+    "files": [
+      {
+        "file": "Itz-Agasta_pinray_86097238059f/LICENSE",
+        "url": "https://raw.githubusercontent.com/Itz-Agasta/pinray/86097238059f38dd9f8d818bd6a513e7300aa9a2/LICENSE"
+      }
+    ]
+  },
+  "profiling@1.0.18": {
+    "repository": "aclysma/profiling",
+    "revision": "8271551172eb6fa4cba47369aedd93790c623df9",
+    "crate_path": "profiling",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "aclysma_profiling_8271551172eb/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE"
+      },
+      {
+        "file": "aclysma_profiling_8271551172eb/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT"
+      }
+    ]
+  },
+  "siphasher@1.0.3": {
+    "repository": "jedisct1/rust-siphash",
+    "revision": "451f67d73a772cba325728109bbfa247750ed076",
+    "crate_path": "",
+    "license": "MIT/Apache-2.0",
+    "notes": "The upstream COPYING file preserves copyright attribution and links to the MIT/Apache-2.0 terms; the linked canonical SPDX texts are included here.",
+    "omit_spdx_copyright_template": true,
+    "files": [
+      {
+        "file": "spdx_d46e94e2c78c/MIT.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/MIT.txt"
+      },
+      {
+        "file": "spdx_d46e94e2c78c/Apache-2.0.txt",
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/d46e94e2c78ceede1cfc63cfa0396472d2798d4c/text/Apache-2.0.txt"
+      }
+    ]
+  },
+  "spirv@0.4.0+sdk-1.4.341.0": {
+    "repository": "gfx-rs/rspirv",
+    "revision": "8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4",
+    "crate_path": "spirv",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "file": "gfx-rs_rspirv_8afc3d0ac8e1/LICENSE",
+        "url": "https://raw.githubusercontent.com/gfx-rs/rspirv/8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4/LICENSE"
+      }
+    ]
+  }
+}

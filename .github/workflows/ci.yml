@@ -1,72 +1,105 @@
-# Build + clippy + test on every OS/architecture a release targets.
-#
-# Linux needs libpipewire-0.3-dev >= 1.x for the capture backend — that is
-# why ubuntu-24.04 is the floor (22.04 ships PipeWire 0.3.48, which the
-# libspa crate no longer compiles against).
-
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Immutable source commit to validate for a release
+        required: true
+        type: string
 
 permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
+  MACOSX_DEPLOYMENT_TARGET: "12.3"
 
 jobs:
   test:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-24.04
-          - ubuntu-24.04-arm
-          - macos-15 # arm64; pinned so runner migrations do not change CI underneath us
-          - macos-15-intel # x86_64
-          - windows-latest # x86_64
-          - windows-11-arm
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
+      - name: Verify source commit
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Install PipeWire build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev clang pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
-      - name: Clippy without the capture backend (UI-only dev build)
+      - name: Check the Mac App Store build
+        if: runner.os == 'macOS'
+        run: |
+          cargo clippy --all-targets --features mac-app-store --locked -- -D warnings
+          cargo test --features mac-app-store --locked
+          python scripts/third_party_notices.py --target "${{ matrix.target }}" \
+            --features mac-app-store --output target/store-THIRD_PARTY_NOTICES.txt
+      - name: Validate release scripts
         if: matrix.os == 'ubuntu-24.04'
-        run: cargo clippy --all-targets --no-default-features --locked -- -D warnings
-
-      # Pull requests only: an optimized build to hand to a reviewer. Pushes
-      # skip it — clippy --all-targets and the tests already compile the
-      # whole tree, and nothing downloads a push's artifacts.
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Check the UI-only build
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          cargo clippy --all-targets --no-default-features --locked -- -D warnings
+          cargo test --no-default-features --locked
+      - name: Generate dependency notices
+        run: python scripts/third_party_notices.py --target "${{ matrix.target }}" --output target/THIRD_PARTY_NOTICES.txt
       - name: Build for PR testing
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && inputs.source_sha == ''
         run: cargo build --release --locked
       - name: Stage the download
-        if: github.event_name == 'pull_request'
-        shell: bash
+        if: github.event_name == 'pull_request' && inputs.source_sha == ''
+        env:
+          SOURCE_SHA: ${{ github.sha }}
         run: |
+          binary=target/release/scrannotate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            binary="$binary.exe"
+          fi
+          python scripts/package_release.py --binary "$binary" \
+            --target "${{ matrix.target }}" --source-sha "$SOURCE_SHA" \
+            --notices target/THIRD_PARTY_NOTICES.txt
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             version="$(cargo metadata --format-version 1 --no-deps --locked | jq -r '.packages[] | select(.name == "scrannotate") | .version')"
-            packaging/macos/bundle.sh target/release/scrannotate "$version" \
-              "dist/scrannotate-macos-$RUNNER_ARCH.app.zip"
-          elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            mkdir -p dist && cp target/release/scrannotate.exe dist/
-          else
-            mkdir -p dist && cp target/release/scrannotate dist/
+            packaging/macos/bundle.sh "$binary" "$version" \
+              "dist/scrannotate-${{ matrix.target }}.app.zip" target/THIRD_PARTY_NOTICES.txt
           fi
       - name: Upload PR build
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && inputs.source_sha == ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scrannotate-${{ runner.os }}-${{ runner.arch }}
           path: dist/
+          if-no-files-found: error
           retention-days: 14
