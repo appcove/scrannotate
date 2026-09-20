@@ -28,7 +28,8 @@ Submitting a pull request constitutes acceptance of these terms.
 
 ## Development setup
 
-Rust 1.88+ on Linux, macOS, or Windows. On Linux the capture backend
+Rust 1.92+ on Linux, macOS, or Windows. The repository pins Rust 1.96.1
+for development and CI in `rust-toolchain.toml`. On Linux the capture backend
 builds against PipeWire (1.x — e.g. Ubuntu 24.04+):
 
 ```
@@ -40,9 +41,9 @@ macOS and Windows need no system packages.
 Build and test:
 
 ```
-cargo build
-cargo test
-cargo clippy --all-targets
+cargo build --locked
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
 ```
 
 PipeWire is only required on Linux, and only by the `capture` cargo
@@ -61,8 +62,18 @@ Please keep `cargo clippy --all-targets` warning-free and `cargo test`
 green on every platform; match the style of the surrounding code. CI
 (`.github/workflows/ci.yml`) runs clippy, build, and tests on Linux
 (x86_64 + arm64), macOS, and Windows (x86_64 + arm64) for every PR.
-Releases are built by `.github/workflows/release.yml` when a `v*` tag is
-pushed.
+Releases are prepared by `.github/workflows/release.yml` on qualifying pushes
+to `main` or manual dispatch. The package version selects the release;
+all native validation jobs must pass for the same immutable source commit
+before packaging and publication. See [release procedures](docs/releases.md).
+
+Mac App Store file authorization is behind `mac-app-store`; on a Mac also run
+`cargo test --locked --features mac-app-store` and
+`cargo clippy --locked --all-targets --features mac-app-store -- -D warnings`.
+Test installed sandboxed packages using the
+[native acceptance checks](docs/native-file-access.md). Cross-compilation
+does not replace these checks. Packaging entry points and required signing
+inputs are documented in [store packaging](docs/store-packaging.md).
 
 ## Testing UI changes
 
