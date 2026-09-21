@@ -231,7 +231,7 @@ fn capture_with_recovery(
                 match choice {
                     rfd::MessageDialogResult::Yes => continue,
                     rfd::MessageDialogResult::No => {
-                        return Ok(platform_files::open_image()?.map(|image| {
+                        return Ok(platform_files::open_image(None)?.map(|image| {
                             (
                                 capture::Capture {
                                     image,
