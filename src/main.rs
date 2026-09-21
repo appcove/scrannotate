@@ -11,6 +11,8 @@ mod document;
 mod editor;
 mod export;
 mod platform_files;
+#[cfg(test)]
+mod test_support;
 mod prefs;
 mod ui;
 mod view;

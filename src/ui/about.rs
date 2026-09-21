@@ -142,7 +142,8 @@ mod tests {
             ..Default::default()
         };
         for _ in 0..3 {
-            let _ = ctx.run_ui(
+            let _ = crate::test_support::run_ui(
+                &ctx,
                 egui::RawInput {
                     screen_rect: Some(canvas),
                     ..Default::default()

@@ -79,6 +79,22 @@
       }
     ]
   },
+  "accesskit_consumer@0.38.0": {
+    "repository": "AccessKit/accesskit",
+    "revision": "c88605b96d04431f9c3c792464a0f2f253480e94",
+    "crate_path": "consumer",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_c88605b96d04/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_c88605b96d04/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT"
+      }
+    ]
+  },
   "accesskit_macos@0.26.2": {
     "repository": "AccessKit/accesskit",
     "revision": "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
@@ -92,6 +108,22 @@
       {
         "file": "AccessKit_accesskit_a55d3e1a18bb/LICENSE-MIT",
         "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT"
+      }
+    ]
+  },
+  "accesskit_macos@0.26.3": {
+    "repository": "AccessKit/accesskit",
+    "revision": "c88605b96d04431f9c3c792464a0f2f253480e94",
+    "crate_path": "platforms/macos",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "AccessKit_accesskit_c88605b96d04/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-APACHE"
+      },
+      {
+        "file": "AccessKit_accesskit_c88605b96d04/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT"
       }
     ]
   },
@@ -253,6 +285,22 @@
       }
     ]
   },
+  "ecolor@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/ecolor",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      }
+    ]
+  },
   "eframe@0.35.0": {
     "repository": "emilk/egui",
     "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
@@ -266,6 +314,22 @@
       {
         "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
         "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "eframe@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/eframe",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
       }
     ]
   },
@@ -285,6 +349,22 @@
       }
     ]
   },
+  "egui-wgpu@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/egui-wgpu",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      }
+    ]
+  },
   "egui-winit@0.35.0": {
     "repository": "emilk/egui",
     "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
@@ -298,6 +378,22 @@
       {
         "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
         "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui-winit@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/egui-winit",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
       }
     ]
   },
@@ -317,6 +413,22 @@
       }
     ]
   },
+  "egui@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/egui",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      }
+    ]
+  },
   "egui_glow@0.35.0": {
     "repository": "emilk/egui",
     "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
@@ -330,6 +442,22 @@
       {
         "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
         "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "egui_glow@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/egui_glow",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
       }
     ]
   },
@@ -349,6 +477,22 @@
       }
     ]
   },
+  "emath@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/emath",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      }
+    ]
+  },
   "epaint@0.35.0": {
     "repository": "emilk/egui",
     "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
@@ -365,6 +509,22 @@
       }
     ]
   },
+  "epaint@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/epaint",
+    "license": "MIT OR Apache-2.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      }
+    ]
+  },
   "epaint_default_fonts@0.35.0": {
     "repository": "emilk/egui",
     "revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
@@ -378,6 +538,22 @@
       {
         "file": "emilk_egui_6f15dc0e16b2/LICENSE-MIT",
         "url": "https://raw.githubusercontent.com/emilk/egui/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+      }
+    ]
+  },
+  "epaint_default_fonts@0.36.2": {
+    "repository": "emilk/egui",
+    "revision": "49682f8baa058bf49e011035cfbd6e825f88a5ef",
+    "crate_path": "crates/epaint_default_fonts",
+    "license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+    "files": [
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "file": "emilk_egui_49682f8baa05/LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
       }
     ]
   },

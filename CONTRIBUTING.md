@@ -28,7 +28,7 @@ Submitting a pull request constitutes acceptance of these terms.
 
 ## Development setup
 
-Rust 1.92+ on Linux, macOS, or Windows. The repository pins Rust 1.96.1
+Rust 1.95+ on Linux, macOS, or Windows. The repository pins Rust 1.96.1
 for development and CI in `rust-toolchain.toml`. On Linux the capture backend
 builds against PipeWire (1.x — e.g. Ubuntu 24.04+):
 

@@ -675,7 +675,7 @@ mod tests {
             .unwrap()
             .native_pixels_per_point = Some(2.0);
         let mut action = None;
-        let output = ctx.run_ui(input, |ui| {
+        let output = crate::test_support::run_ui(ctx, input, |ui| {
             let ctx = ui.ctx();
             action = toolbar.show(
                 ctx,

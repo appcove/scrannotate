@@ -814,14 +814,16 @@ mod tests {
             ..Modifiers::NONE
         };
         egui::RawInput {
-            modifiers,
-            events: vec![egui::Event::Key {
-                key,
-                physical_key: None,
-                pressed: true,
-                repeat: false,
-                modifiers,
-            }],
+            events: vec![
+                egui::Event::ModifiersChanged(modifiers),
+                egui::Event::Key {
+                    key,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers,
+                },
+            ],
             ..Default::default()
         }
     }
@@ -836,7 +838,8 @@ mod tests {
             points: Vec::new(),
         };
         let ctx = Context::default();
-        let output = ctx.run_ui(Default::default(), |_| app.save(&ctx, true));
+        let output =
+            crate::test_support::run_ui(&ctx, Default::default(), |_| app.save(&ctx, true));
         assert!(app.editor.state.is_pointer_op());
         assert_eq!(app.editor.doc.shapes().count(), 0);
         assert!(app.toast.as_ref().is_some_and(|toast| toast.is_error));
@@ -856,7 +859,7 @@ mod tests {
         // directory. No writes occur; failure must preserve the text.
         app.out_dir = std::env::current_exe().expect("test executable");
         let ctx = Context::default();
-        let output = ctx.run_ui(command_input(Key::S), |_| {
+        let output = crate::test_support::run_ui(&ctx, command_input(Key::S), |_| {
             let Some(toolbar::ToolbarAction::Save { close }) = app.text_lifecycle_action(&ctx)
             else {
                 panic!("Save shortcut must remain available while typing");
@@ -889,7 +892,7 @@ mod tests {
         edit_text(&mut app);
         let original = app.editor.doc.base.clone();
         let ctx = Context::default();
-        let output = ctx.run_ui(Default::default(), |_| {
+        let output = crate::test_support::run_ui(&ctx, Default::default(), |_| {
             assert!(app.prepare_export(&ctx));
             app.apply_save_result(&ctx, true, Ok(None));
         });
@@ -983,7 +986,7 @@ mod tests {
         app.editor.view.pan_by(Vec2::new(100.0, 50.0));
         edit_text(&mut app);
         let ctx = Context::default();
-        let _ = ctx.run_ui(Default::default(), |_| app.sync_texture(&ctx));
+        let _ = crate::test_support::run_ui(&ctx, Default::default(), |_| app.sync_texture(&ctx));
         assert!(app.texture.is_some());
         assert!(!app.baked_pixelates.is_empty());
         let new_image = RgbaImage::from_pixel(30, 20, image::Rgba([40, 80, 120, 255]));
@@ -1009,7 +1012,7 @@ mod tests {
         let mut app = app();
         edit_text(&mut app);
         let ctx = Context::default();
-        let output = ctx.run_ui(command_input(Key::Q), |_| {
+        let output = crate::test_support::run_ui(&ctx, command_input(Key::Q), |_| {
             app.handle_text_lifecycle_shortcuts(&ctx);
         });
         assert!(output.viewport_output.values().any(|viewport| {

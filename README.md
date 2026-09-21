@@ -94,7 +94,7 @@ Platform wrinkles for downloaded binaries:
 
 ### Building from source
 
-Rust 1.92+ is required; `rust-toolchain.toml` pins the development and CI
+Rust 1.95+ is required; `rust-toolchain.toml` pins the development and CI
 compiler to 1.96.1. On Linux the capture backend builds against PipeWire:
 
 ```
