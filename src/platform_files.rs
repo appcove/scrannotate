@@ -21,24 +21,27 @@ pub fn save_image(image: &RgbaImage, suggested_dir: &Path) -> Result<Option<Path
     }
 }
 
-/// Load a PNG selected through the platform's file dialog. The image is
-/// decoded before the panel's temporary authorization is released.
-pub fn open_image() -> Result<Option<RgbaImage>> {
+/// Load a PNG selected through the platform's file dialog, starting in
+/// `initial` when given (a hint only; no access is inferred from it). The
+/// image is decoded before the panel's temporary authorization is released.
+pub fn open_image(initial: Option<&Path>) -> Result<Option<RgbaImage>> {
     #[cfg(all(target_os = "macos", feature = "mac-app-store"))]
     {
-        macos::open_image()
+        macos::open_image(initial)
     }
     #[cfg(any(windows, all(target_os = "macos", not(feature = "mac-app-store"))))]
     {
-        rfd::FileDialog::new()
+        let mut dialog = rfd::FileDialog::new()
             .set_title("Open PNG image")
-            .add_filter("PNG images", &["png"])
-            .pick_file()
-            .map(|path| load_image(&path))
-            .transpose()
+            .add_filter("PNG images", &["png"]);
+        if let Some(initial) = initial {
+            dialog = dialog.set_directory(initial);
+        }
+        dialog.pick_file().map(|path| load_image(&path)).transpose()
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
+        let _ = initial;
         anyhow::bail!("Native image selection is available on Windows and macOS; use --from-file")
     }
 }

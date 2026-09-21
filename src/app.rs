@@ -312,7 +312,7 @@ impl ScreencapApp {
             self.restore_text_focus(ctx);
             return;
         }
-        self.apply_open_result(ctx, platform_files::open_image());
+        self.apply_open_result(ctx, platform_files::open_image(None));
         self.restore_text_focus(ctx);
     }
 

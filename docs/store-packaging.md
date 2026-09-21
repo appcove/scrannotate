@@ -152,8 +152,8 @@ The script validates profile expiry, platform, explicit App ID, team, and
 distribution status, then derives the application/team entitlements from that
 profile. It enables App Sandbox, user-selected file read/write, and app-scoped
 security bookmarks. It embeds the profile, icon, privacy policy, license, and
-notices in the bundle; sets version/icon metadata; signs the app; verifies its
-signature; and checks the signing certificate against the profile's allowed
+notices in the bundle; sets version/icon metadata; signs the app with a secure
+timestamp; verifies its signature; and checks the signing certificate against the profile's allowed
 certificates. `productbuild` creates the signed installer and `pkgutil` checks
 its signature. Manually check the printed installer certificate name against
 the profile's developer team: the script verifies the installer signature but

@@ -135,7 +135,9 @@ cp "$icon" "$app/Contents/Resources/scrannotate.icns"
 cp "$project_root/LICENSE" "$project_root/NOTICE" "$project_root/PRIVACY.md" "$app/Contents/Resources/"
 cp "$notices" "$app/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 plutil -lint "$app/Contents/Info.plist" "$staging/entitlements.plist"
-codesign --force --sign "$application_identity" --entitlements "$staging/entitlements.plist" "$app"
+# --timestamp: App Store Connect expects a secure timestamp on the application
+# signature itself; productbuild only timestamps the installer around it.
+codesign --force --timestamp --sign "$application_identity" --entitlements "$staging/entitlements.plist" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 codesign --display --extract-certificates "$staging/signer" "$app"
 python3 - "$staging" <<'PY'

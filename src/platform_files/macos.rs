@@ -67,8 +67,8 @@ pub(super) fn save_image(image: &RgbaImage, suggested_dir: &Path) -> Result<Opti
     // `directory` remains alive through encoding, flush, and cleanup.
 }
 
-pub(super) fn open_image() -> Result<Option<RgbaImage>> {
-    let Some(file) = select_location(false, None, false)? else {
+pub(super) fn open_image(initial: Option<&Path>) -> Result<Option<RgbaImage>> {
+    let Some(file) = select_location(false, initial, false)? else {
         return Ok(None);
     };
     super::load_image(&file.path()?).map(Some)

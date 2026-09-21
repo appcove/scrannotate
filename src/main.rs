@@ -59,7 +59,9 @@ struct Cli {
     #[arg(long, value_name = "DIR")]
     save_path: Option<PathBuf>,
 
-    /// Annotate an existing image instead of capturing the screen.
+    /// Annotate an existing image instead of capturing the screen. Mac App
+    /// Store builds cannot read arbitrary paths; there the Open PNG panel
+    /// starts at this location and the file must be picked explicitly.
     #[arg(long, value_name = "PATH")]
     from_file: Option<PathBuf>,
 
@@ -281,13 +283,31 @@ fn run(cli: Cli) -> Result<()> {
 
     let mut select_full = cli.from_file.is_some() || cli.open_image;
     let (img, display) = match &cli.from_file {
+        // A CLI path grants no access under the App Sandbox: opening it
+        // directly fails with a permission error. Treat it as a starting
+        // location for the Open PNG panel and require an explicit pick.
+        #[cfg(all(target_os = "macos", feature = "mac-app-store"))]
+        Some(path) => {
+            eprintln!(
+                "This Mac App Store build cannot open {} directly; choose it in the Open PNG panel.",
+                path.display()
+            );
+            let start = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty());
+            match platform_files::open_image(start)? {
+                Some(image) => (image, None),
+                None => return Ok(()),
+            }
+        }
+        #[cfg(not(all(target_os = "macos", feature = "mac-app-store")))]
         Some(path) => (
             image::open(path)
                 .with_context(|| format!("opening {}", path.display()))?
                 .to_rgba8(),
             None,
         ),
-        None if cli.open_image => match platform_files::open_image()? {
+        None if cli.open_image => match platform_files::open_image(None)? {
             Some(image) => (image, None),
             None => return Ok(()),
         },

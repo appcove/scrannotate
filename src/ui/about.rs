@@ -1,6 +1,6 @@
 //! Privacy and license information remains available before selecting a region.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Align2, Context, Id, Rect, RichText, Vec2};
 
@@ -75,13 +75,48 @@ impl About {
 }
 
 fn load_notices() -> String {
-    std::env::current_exe()
-        .ok()
-        .and_then(|executable| read_notices(&executable))
+    package_root()
+        .and_then(|root| std::fs::read_to_string(root.join("THIRD_PARTY_NOTICES.txt")).ok())
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|executable| read_notices(&executable))
+        })
         .unwrap_or_else(|| {
             "Third-party notices are unavailable in this build. Distributed release packages include THIRD_PARTY_NOTICES.txt beside the executable or in the app bundle's Resources folder."
                 .to_owned()
         })
+}
+
+/// The MSIX install directory when running packaged, whatever the launch
+/// route (Start menu, or the `scrannotate` execution alias whose reported
+/// executable path may differ from the package layout). `None` elsewhere.
+#[cfg(windows)]
+fn package_root() -> Option<PathBuf> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt as _;
+    use windows_sys::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
+    use windows_sys::Win32::Storage::Packaging::Appx::GetCurrentPackagePath;
+
+    let mut length: u32 = 0;
+    // SAFETY: a zero-length query only writes the required length.
+    if unsafe { GetCurrentPackagePath(&mut length, std::ptr::null_mut()) }
+        != ERROR_INSUFFICIENT_BUFFER
+    {
+        return None;
+    }
+    let mut buffer = vec![0u16; usize::try_from(length).ok()?];
+    // SAFETY: `buffer` holds `length` u16 slots, as requested above.
+    if unsafe { GetCurrentPackagePath(&mut length, buffer.as_mut_ptr()) } != ERROR_SUCCESS {
+        return None;
+    }
+    let end = buffer.iter().position(|&unit| unit == 0)?;
+    Some(PathBuf::from(OsString::from_wide(&buffer[..end])))
+}
+
+#[cfg(not(windows))]
+fn package_root() -> Option<PathBuf> {
+    None
 }
 
 fn read_notices(executable: &Path) -> Option<String> {
