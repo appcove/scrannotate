@@ -47,6 +47,12 @@ pub struct Toolbar {
     /// Tallest the status line has needed to be so far this session, so it
     /// can only grow — never shrink back down and make the panel jump.
     status_min_h: f32,
+    /// The scale factor `status_min_h` was measured at. It is a height in
+    /// screen px at one font size and padding, so a scale change makes it
+    /// meaningless: it is remeasured from zero the first frame at the new
+    /// scale (otherwise shrinking Large → Small would leave the footer at
+    /// the Large height until a longer message happened to grow it).
+    status_min_h_scale: f32,
     about: About,
 }
 
@@ -60,6 +66,7 @@ impl Toolbar {
             size: Vec2::new(w + 30.0, 500.0),
             ui_scale,
             status_min_h: 0.0,
+            status_min_h_scale: ui_scale.factor(),
             about: About::default(),
         }
     }
@@ -257,17 +264,12 @@ impl Toolbar {
                                         // correctly-measured clamp lands
                                         // right away, instead of waiting on
                                         // whatever future input happens to
-                                        // trigger one.
+                                        // trigger one. (The status line's
+                                        // high-water mark resets itself
+                                        // on that frame, keyed on the
+                                        // scale it was measured at — see
+                                        // `status_min_h_scale`.)
                                         ctx.request_repaint();
-                                        // Same staleness bug, for the status
-                                        // line: its reserved height is a
-                                        // high-water mark in screen px at
-                                        // the *old* scale's font/padding,
-                                        // so shrinking the toolbar would
-                                        // otherwise leave the status box
-                                        // too tall until a longer message
-                                        // happened to grow it again.
-                                        self.status_min_h = 0.0;
                                     }
                                 }
                             }
@@ -296,6 +298,10 @@ impl Toolbar {
                         .size()
                         .y
                         .min(status_max_h);
+                    if self.status_min_h_scale != scale {
+                        self.status_min_h = 0.0;
+                        self.status_min_h_scale = scale;
+                    }
                     self.status_min_h = self.status_min_h.max(status_text_h);
                     let status_height = self.status_min_h + status_pad * 2.0;
                     let body_height = (content_size.y
@@ -482,8 +488,11 @@ impl Toolbar {
                             if redo {
                                 editor.redo();
                             }
-                            let (fit, reset) =
-                                pair(ui, ("Reset view F", true, false), ("Reset all", true, false));
+                            let (fit, reset) = pair(
+                                ui,
+                                ("Reset view F", true, false),
+                                ("Reset all", true, false),
+                            );
                             if fit {
                                 editor.view.fit(editor.doc.image_size(), canvas.size());
                             }
@@ -770,6 +779,67 @@ mod tests {
             None,
         );
         assert!(matches!(action, Some(ToolbarAction::Save { close: false })));
+    }
+
+    #[test]
+    fn status_footer_remeasures_when_scale_shrinks() {
+        let ctx = Context::default();
+        let mut toolbar = Toolbar::new(UiScale::Large);
+        let mut editor = editor();
+        editor.doc.region = Some(editor.doc.image_rect());
+        let long = Some(StatusOverride {
+            message: "Saved to a rather long path that wraps onto several lines of the footer"
+                .repeat(2),
+            is_error: false,
+        });
+        for _ in 0..3 {
+            frame(
+                &ctx,
+                &mut toolbar,
+                &mut editor,
+                vec![],
+                long.as_ref().map(clone_status),
+            );
+        }
+        let at_large = toolbar.status_min_h;
+        assert!(at_large > 0.0);
+
+        toolbar.ui_scale = UiScale::Small;
+        for _ in 0..3 {
+            frame(
+                &ctx,
+                &mut toolbar,
+                &mut editor,
+                vec![],
+                long.as_ref().map(clone_status),
+            );
+        }
+        let at_small = toolbar.status_min_h;
+        assert!(
+            at_small < at_large,
+            "footer kept the Large height after shrinking: {at_small} vs {at_large}"
+        );
+
+        // A fresh Small toolbar measures the same message identically, so
+        // the reset really remeasured rather than merely shrinking a bit.
+        let mut fresh = Toolbar::new(UiScale::Small);
+        for _ in 0..3 {
+            frame(
+                &ctx,
+                &mut fresh,
+                &mut editor,
+                vec![],
+                long.as_ref().map(clone_status),
+            );
+        }
+        assert_eq!(fresh.status_min_h, at_small);
+    }
+
+    fn clone_status(s: &StatusOverride) -> StatusOverride {
+        StatusOverride {
+            message: s.message.clone(),
+            is_error: s.is_error,
+        }
     }
 
     #[test]
