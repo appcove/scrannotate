@@ -95,13 +95,18 @@ impl Toolbar {
                     ui.set_width(toolbar_w);
                     // Chunky, easy-to-hit controls that stand out from the
                     // popup background.
-                    // The width DragValue floors itself at (see egui's
-                    // `DragValue`: its box is `min_size(interact_size)`
-                    // regardless of content) plus the gap before it —
-                    // shared with `interact_size`/`item_spacing` below so
-                    // the slider math can't drift from what they actually
-                    // are again.
-                    let interact_w = 36.0 * scale;
+                    // `min_size(interact_size)` (what DragValue sets its
+                    // box to) is a floor, not a cap — the same trap the
+                    // size-picker buttons hit: three digits ("120", the
+                    // top of the text-size range) at a big scale need more
+                    // than the box's nominal width, and since nothing
+                    // clips, the box — and with it the row, and the popup
+                    // Frame sized to fit its content — grows past
+                    // `toolbar_w` instead. Size it with real headroom
+                    // above the widest value this range ever shows, not
+                    // tight against it, and share it with `slider_width`
+                    // below so the row math stays exact regardless.
+                    let interact_w = 54.0 * scale;
                     let gap_w = 6.0 * scale;
                     let spacing = ui.spacing_mut();
                     // Rail, less the drag-value box egui puts beside it.
