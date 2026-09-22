@@ -19,7 +19,7 @@ mod view;
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use clap::Parser;
 
 /// Screenshot + annotation tool. Captures one screen per shot as a raw
@@ -303,12 +303,16 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         #[cfg(not(all(target_os = "macos", feature = "mac-app-store")))]
-        Some(path) => (
-            image::open(path)
-                .with_context(|| format!("opening {}", path.display()))?
-                .to_rgba8(),
-            None,
-        ),
+        Some(path) => {
+            // Scoped: the Mac App Store arm above has no use for it.
+            use anyhow::Context;
+            (
+                image::open(path)
+                    .with_context(|| format!("opening {}", path.display()))?
+                    .to_rgba8(),
+                None,
+            )
+        }
         None if cli.open_image => match platform_files::open_image(None)? {
             Some(image) => (image, None),
             None => return Ok(()),
