@@ -12,8 +12,8 @@ scrannotate is a fast, keyboard-friendly screenshot annotation tool for
 **Linux (Wayland and X11), macOS, and Windows**. It grabs one screen per shot as a
 **raw frame** — no image encoding, no disk round-trip, so the editor is up
 in a blink. Select, annotate, and ship — copy to the clipboard or save a
-PNG — without ever leaving that one surface. No editor window, no dialogs,
-no save prompts.
+PNG — from one editor surface. Store builds use native dialogs when file
+authorization is needed.
 
 ![The editor over a frozen frame: numbered markers, a highlight, an ellipse, a blurred strip, a line, inline text with a penned underline, and an arrow into a selected box showing resize handles and a rotate knob](docs/screenshot-annotate.png)
 
@@ -49,13 +49,18 @@ no save prompts.
   labeled "For Current Object" or "For New Objects" and shows the target's
   actual color/width/size. A large color picker keeps your recently used
   colors one click away.
-- **Pixel-identical export.** The PNG/clipboard renderer (tiny-skia) shares
-  its geometry with the on-screen renderer, so what you see is exactly what
-  you ship — including rotated shapes and rotated text.
+- **A toolbar sized to you.** Three small buttons at the top scale the
+  whole panel — width, buttons, every font — between Small, Medium, and
+  Large.
+- **Consistent export.** The PNG/clipboard renderer shares annotation
+  geometry and font layout with the on-screen renderer, including rotated
+  text and fallback glyphs. Transparent PNG colors are preserved; CPU and
+  GPU edge antialiasing can differ. See [export behavior](docs/export.md).
 - **Respectful of your flow.** Copy (`Enter`/`Ctrl+C`) puts the region on
   the clipboard and closes; Save (`Ctrl+S`) writes a PNG and closes; `Esc`
   steps back and double-`Esc` discards — never a confirmation dialog.
-  Preferences (recent colors, deliberately-set sizes) persist between runs.
+  Preferences (recent colors, deliberately-set sizes, toolbar UI size)
+  persist between runs.
 
 ## Install
 
@@ -89,7 +94,8 @@ Platform wrinkles for downloaded binaries:
 
 ### Building from source
 
-Rust 1.88+. On Linux the capture backend builds against PipeWire:
+Rust 1.95+ is required; `rust-toolchain.toml` pins the development and CI
+compiler to 1.96.1. On Linux the capture backend builds against PipeWire:
 
 ```
 sudo apt install libpipewire-0.3-dev clang pkg-config   # needs PipeWire 1.x, e.g. Ubuntu 24.04+
@@ -110,8 +116,8 @@ PipeWire headers.)
 Every pull request runs clippy, a release build, and tests on Linux, macOS,
 and Windows. Successful runs keep downloadable builds for 14 days: open the
 PR's **Checks**, select the **CI** run, and download the artifact for the
-machine you want from the run's **Artifacts** section. macOS gets a zipped
-`.app`; Linux and Windows get the bare executable. These are test
+machine you want from the run's **Artifacts** section. Downloads include
+the executable, privacy policy, and licenses; macOS also gets a zipped `.app`. These are test
 artifacts, not public GitHub Releases — a Release is created only when a
 version-bump PR is merged to `main`.
 
@@ -144,15 +150,15 @@ stable bundle identity. Running the raw executable from Terminal instead
 attributes the launch and permission flow to Terminal. For command-line
 arguments, use `open -a scrannotate --args --screen 2`; hotkey tools can
 launch the app the same way. Expect macOS 15+ to re-confirm screen-recording
-apps roughly monthly; every capture tool gets the same treatment. Keyboard
+apps periodically; the exact prompts depend on OS version. Keyboard
 shortcuts read as `Ctrl` below but are the `⌘` key on macOS.
 
 ### Windows
 
-Windows 10 1903+ (Windows Graphics Capture, with a DXGI fallback — note the
-fallback cannot embed the `--cursor` pointer). On Windows 10 the system may
-flash its yellow capture border for the instant of the shot; Windows 11
-suppresses it. HDR displays currently capture in SDR (washed-out colors) —
+Windows 10 2004+ (Windows Graphics Capture). Capture uses WGC explicitly
+for rotation and cursor handling. The system may show its capture border;
+border suppression depends on the OS and its permission state.
+HDR displays currently capture in SDR (washed-out colors) —
 a known limitation of BGRA8 capture. Bind a hotkey via a shortcut file's
 *Properties → Shortcut key*, PowerToys, or AutoHotkey.
 
@@ -166,6 +172,9 @@ scrannotate --cursor             # include the mouse cursor in the capture
 scrannotate --delay 3            # wait 3s before capturing (open that menu first)
 scrannotate --save-path DIR      # where Ctrl+S saves (default ~/Pictures/Screenshots)
 scrannotate --from-file img.png  # annotate an existing image (no capture)
+scrannotate --open               # choose a PNG with a native dialog (Windows/macOS)
+scrannotate --build-info         # version, store feature, and configured privacy URL
+scrannotate --no-dialogs         # keep startup failures on stderr for scripts
 ```
 
 On Linux under Wayland, the first use of each screen slot shows the
@@ -174,6 +183,18 @@ number means; the granted portal token is saved per slot, so subsequent
 captures skip it. On X11, macOS, and Windows there is no dialog: screen
 numbers follow the display list, primary first. Bind hotkeys to taste:
 `Print` → `scrannotate`, `Shift+Print` → `scrannotate --screen 2`.
+
+On Windows and macOS, **Open PNG…** and **Save folder…** are also available
+in the editor. The default Windows output follows the system Pictures
+Known Folder, including redirected folders. Mac App Store builds remember
+the output folder's permission across launches; `--save-path` is a chooser
+hint, not a sandbox permission. See [native file access](docs/native-file-access.md).
+
+Startup failures from Finder or Start show a native error. Capture failures
+offer retry, PNG selection, or quit; terminal launches retain diagnostic
+output and a failing exit status. Use `--no-dialogs` in fully redirected
+automation to suppress native error/recovery dialogs. **About & Privacy** opens offline privacy,
+license, and support information. See [editor controls](docs/editor-ui.md).
 
 ### The flow
 
@@ -236,11 +257,12 @@ Click the color swatch in the toolbar's settings section:
 Recently used colors form a most-recently-used stack (clicking one loads it
 into the picker), and colors you actually draw with bubble to its head. The
 recents — plus stroke width and text size once you've deliberately adjusted
-them — persist between runs in a small state directory:
-`$XDG_STATE_HOME/scrannotate` on Linux (default
+them, and the toolbar's Small/Medium/Large UI size — persist between runs in
+a small state directory: `$XDG_STATE_HOME/scrannotate` on Linux (default
 `~/.local/state/scrannotate`), `~/Library/Application Support/scrannotate`
-on macOS, `%LOCALAPPDATA%\scrannotate` on Windows. Untouched sizes stay
-resolution-scaled defaults.
+on macOS, `%LOCALAPPDATA%\scrannotate` on Windows. Untouched stroke/text
+sizes stay resolution-scaled defaults; the UI size has no such default and
+is always written.
 
 ## How it works
 
@@ -257,8 +279,7 @@ one frame taken, no encoding:
   (`src/capture/monitor.rs`, shared with macOS and Windows).
 - **macOS**: **ScreenCaptureKit** (`src/capture/monitor.rs`), picking the
   display by its ID.
-- **Windows**: **Windows Graphics Capture** with a DXGI desktop-duplication
-  fallback (`src/capture/monitor.rs`).
+- **Windows**: **Windows Graphics Capture** (`src/capture/monitor.rs`).
 
 The frame is shown frozen in a fullscreen window on the monitor it came
 from; everything you do happens on that frozen frame. (On macOS that means
@@ -280,6 +301,19 @@ restore token instead of returning it, so `src/capture/screencast.rs`
 catches it with a tracing layer. Drop that when pinray exposes the token.
 
 [pinray]: https://crates.io/crates/pinray
+
+The macOS capture crate has a small [documented local patch](vendor/README.md)
+for display metadata, backing scale, and macOS 12.3 API availability.
+
+## Store preparation
+
+The portable GitHub downloads remain separate from Store submissions.
+[Store packaging](docs/store-packaging.md) describes the MSIX and signed
+Mac App Store package scripts, required account identities, artwork, and
+credentials. [Release documentation](docs/releases.md) covers validation,
+dependency notices, and immutable source selection. The
+[readiness progress report](docs/store-readiness-progress.md) distinguishes
+implemented fixes from native acceptance tests and account work still required.
 
 ## Running inside a container (development)
 

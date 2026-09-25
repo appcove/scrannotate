@@ -1,30 +1,85 @@
 //! Rasterize annotations onto the screenshot for saving/copying. Geometry
 //! comes from `annotate` so this stays in lockstep with the egui renderer;
-//! text uses the same embedded font egui draws with on screen.
+//! text uses egui's own layout, fallback fonts, and glyph atlas.
 
-use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use anyhow::{Context, Result};
-use eframe::egui::{Color32, Pos2};
+use eframe::egui::{Color32, Pos2, epaint::text::Fonts};
 use image::RgbaImage;
-use tiny_skia::{
-    FillRule, FilterQuality, LineCap, LineJoin, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke,
-    Transform,
-};
+use tiny_skia::{FillRule, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Stroke, Transform};
 
 use crate::annotate::{
     Annotation, Shape, arrow_geometry, clamp_px, composite_pixelates, highlight_color,
     marker_radius,
 };
 
+mod text;
+
 /// Save `img` into `dir` under the timestamped scrannotate name, creating
 /// the directory if needed. Returns the written path.
 pub fn save_timestamped(img: &RgbaImage, dir: &std::path::Path) -> Result<std::path::PathBuf> {
-    std::fs::create_dir_all(dir)
-        .with_context(|| format!("creating {}", dir.display()))?;
-    let name = format!("scrannotate-{}.png", chrono::Local::now().format("%Y-%m-%d_%H%M%S"));
-    let path = dir.join(name);
-    img.save(&path).with_context(|| format!("saving {}", path.display()))?;
-    Ok(path)
+    let stem = format!(
+        "scrannotate-{}",
+        chrono::Local::now().format("%Y-%m-%d_%H%M%S")
+    );
+    save_png_named(img, dir, &stem)
+}
+
+fn save_png_named(
+    img: &RgbaImage,
+    dir: &std::path::Path,
+    stem: &str,
+) -> Result<std::path::PathBuf> {
+    use std::io::Write as _;
+
+    save_unique(dir, stem, |file| {
+        let mut writer = std::io::BufWriter::new(file);
+        img.write_to(&mut writer, image::ImageFormat::Png)?;
+        writer.flush()?;
+        Ok(())
+    })
+}
+
+/// `create_new` reserves each name atomically, including across app instances.
+/// Keep the usual name for the first save and add -1, -2, … on collisions.
+fn save_unique(
+    dir: &std::path::Path,
+    stem: &str,
+    write: impl FnOnce(&mut std::fs::File) -> Result<()>,
+) -> Result<std::path::PathBuf> {
+    std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    for suffix in 0_u64.. {
+        let name = if suffix == 0 {
+            format!("{stem}.png")
+        } else {
+            format!("{stem}-{suffix}.png")
+        };
+        let path = dir.join(name);
+        let mut file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => file,
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(err) => return Err(err).with_context(|| format!("creating {}", path.display())),
+        };
+        let result = write(&mut file).and_then(|()| Ok(file.sync_all()?));
+        // Windows cannot remove the incomplete file until its handle is closed.
+        drop(file);
+        if let Err(err) = result {
+            if let Err(cleanup) = std::fs::remove_file(&path) {
+                return Err(err).with_context(|| {
+                    format!(
+                        "saving {}; could not remove incomplete file: {cleanup}",
+                        path.display()
+                    )
+                });
+            }
+            return Err(err).with_context(|| format!("saving {}", path.display()));
+        }
+        return Ok(path);
+    }
+    anyhow::bail!("no unused screenshot filename in {}", dir.display())
 }
 
 pub fn render_to_image<'a>(
@@ -36,20 +91,17 @@ pub fn render_to_image<'a>(
     composite_pixelates(&mut img, annotations.clone());
 
     let (w, h) = img.dimensions();
-    let size = tiny_skia::IntSize::from_wh(w, h).context("empty image")?;
-    // The screenshot is fully opaque, so straight RGBA == premultiplied RGBA
-    // and the buffer can round-trip through tiny-skia unchanged.
-    let mut pixmap = Pixmap::from_vec(img.into_raw(), size).context("building pixmap")?;
-
-    let font = FontRef::try_from_slice(epaint_default_fonts::UBUNTU_LIGHT)
-        .context("loading embedded font")?;
-
+    // tiny-skia uses premultiplied RGBA, while PNG/image/clipboard use
+    // straight RGBA. Render an overlay, then composite it into the original
+    // buffer. This also preserves all untouched pixels exactly, including
+    // hidden RGB at alpha zero and low-alpha colors lost by an 8-bit roundtrip.
+    let mut pixmap = Pixmap::new(w, h).context("empty image or image too large")?;
+    let mut fonts = Fonts::new(Default::default(), Default::default());
     for ann in annotations {
-        draw_annotation(&mut pixmap, &font, ann);
+        draw_annotation(&mut pixmap, &mut fonts, ann)?;
     }
-
-    let full = RgbaImage::from_raw(w, h, pixmap.take())
-        .context("pixmap buffer size mismatch")?;
+    composite_overlay(&mut img, &pixmap);
+    let full = img;
 
     let Some(crop) = crop else { return Ok(full) };
     let x0 = clamp_px(crop.min.x.round(), w.saturating_sub(1));
@@ -57,6 +109,27 @@ pub fn render_to_image<'a>(
     let cw = clamp_px(crop.width().round(), w - x0).max(1);
     let ch = clamp_px(crop.height().round(), h - y0).max(1);
     Ok(image::imageops::crop_imm(&full, x0, y0, cw, ch).to_image())
+}
+
+/// Source-over from a premultiplied overlay into a straight-alpha image.
+fn composite_overlay(base: &mut RgbaImage, overlay: &Pixmap) {
+    for (dst, src) in base.pixels_mut().zip(overlay.pixels()) {
+        if src.alpha() == 0 {
+            continue;
+        }
+        let remaining = 1.0 - f32::from(src.alpha()) / 255.0;
+        let dst_alpha = f32::from(dst[3]) / 255.0;
+        let alpha = f32::from(src.alpha()) / 255.0 + dst_alpha * remaining;
+        for (channel, premultiplied) in [src.red(), src.green(), src.blue()].into_iter().enumerate()
+        {
+            dst[channel] = ((f32::from(premultiplied)
+                + f32::from(dst[channel]) * dst_alpha * remaining)
+                / alpha)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+        }
+        dst[3] = (alpha * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
 }
 
 fn solid_paint(color: Color32) -> Paint<'static> {
@@ -89,7 +162,7 @@ fn rotation_transform(rotation: f32, center: Pos2) -> Transform {
     }
 }
 
-fn draw_annotation(pixmap: &mut Pixmap, font: &FontRef<'_>, ann: &Annotation) {
+fn draw_annotation(pixmap: &mut Pixmap, fonts: &mut Fonts, ann: &Annotation) -> Result<()> {
     let style = &ann.style;
     let paint = solid_paint(style.color);
     let stroke = round_stroke(style.width);
@@ -103,7 +176,7 @@ fn draw_annotation(pixmap: &mut Pixmap, font: &FontRef<'_>, ann: &Annotation) {
                 {
                     pixmap.fill_path(&dot, &paint, FillRule::Winding, identity, None);
                 }
-                return;
+                return Ok(());
             }
             let mut pb = PathBuilder::new();
             pb.move_to(points[0].x, points[0].y);
@@ -151,13 +224,13 @@ fn draw_annotation(pixmap: &mut Pixmap, font: &FontRef<'_>, ann: &Annotation) {
         // Pixelation is baked into the base image before vector drawing.
         Shape::Pixelate { .. } => {}
         Shape::Text { pos, text } => {
-            if ann.rotation == 0.0 {
-                draw_text(pixmap, font, *pos, text, style.font_size, style.color);
-            } else {
-                draw_text_rotated(pixmap, font, *pos, text, style.font_size, style.color, ann.rotation);
-            }
+            text::draw(pixmap, fonts, *pos, text, style, ann.rotation, false)?;
         }
-        Shape::Marker { pos, number, target } => {
+        Shape::Marker {
+            pos,
+            number,
+            target,
+        } => {
             // Arrow first; the circle covers the shaft's root.
             if let Some(target) = target {
                 draw_arrow(pixmap, &paint, &stroke, *pos, *target, style.width);
@@ -166,13 +239,32 @@ fn draw_annotation(pixmap: &mut Pixmap, font: &FontRef<'_>, ann: &Annotation) {
             if let Some(circle) = PathBuilder::from_circle(pos.x, pos.y, radius) {
                 pixmap.fill_path(&circle, &paint, FillRule::Winding, identity, None);
             }
-            draw_text_centered(pixmap, font, *pos, &number.to_string(), style.font_size, Color32::WHITE);
+            text::draw(
+                pixmap,
+                fonts,
+                *pos,
+                &number.to_string(),
+                &crate::annotate::Style {
+                    color: Color32::WHITE,
+                    ..*style
+                },
+                0.0,
+                true,
+            )?;
         }
     }
+    Ok(())
 }
 
 /// Shaft + filled head from `a` to `b` (shared by arrows and markers).
-fn draw_arrow(pixmap: &mut Pixmap, paint: &Paint<'_>, stroke: &Stroke, a: Pos2, b: Pos2, width: f32) {
+fn draw_arrow(
+    pixmap: &mut Pixmap,
+    paint: &Paint<'_>,
+    stroke: &Stroke,
+    a: Pos2,
+    b: Pos2,
+    width: f32,
+) {
     let geo = arrow_geometry(a, b, width);
     let identity = Transform::identity();
     let mut pb = PathBuilder::new();
@@ -191,167 +283,6 @@ fn draw_arrow(pixmap: &mut Pixmap, paint: &Paint<'_>, stroke: &Stroke, a: Pos2, 
     }
 }
 
-/// Match epaint's sizing: a FontId size is the em size in pixels, while
-/// ab_glyph's PxScale is the full glyph-height, so convert via font metrics.
-fn px_scale(font: &FontRef<'_>, size: f32) -> PxScale {
-    let units_per_em = font.units_per_em().unwrap_or(font.height_unscaled());
-    PxScale::from(size * font.height_unscaled() / units_per_em)
-}
-
-fn line_width(font: &FontRef<'_>, scale: PxScale, line: &str) -> f32 {
-    let scaled = font.as_scaled(scale);
-    let mut width = 0.0;
-    let mut prev = None;
-    for ch in line.chars() {
-        let id = scaled.glyph_id(ch);
-        if let Some(prev) = prev {
-            width += scaled.kern(prev, id);
-        }
-        width += scaled.h_advance(id);
-        prev = Some(id);
-    }
-    width
-}
-
-fn draw_text(
-    pixmap: &mut Pixmap,
-    font: &FontRef<'_>,
-    pos: Pos2,
-    text: &str,
-    size: f32,
-    color: Color32,
-) {
-    let scale = px_scale(font, size);
-    let scaled = font.as_scaled(scale);
-    let line_height = scaled.height() + scaled.line_gap();
-    let mut baseline = pos.y + scaled.ascent();
-    for line in text.split('\n') {
-        draw_text_line(pixmap, font, Pos2::new(pos.x, baseline), line, scale, color);
-        baseline += line_height;
-    }
-}
-
-/// Width/height of a text block, matching `draw_text`'s layout.
-fn text_block_size(font: &FontRef<'_>, text: &str, size: f32) -> (f32, f32) {
-    let scale = px_scale(font, size);
-    let scaled = font.as_scaled(scale);
-    let line_height = scaled.height() + scaled.line_gap();
-    let mut width: f32 = 0.0;
-    let mut lines: f32 = 0.0;
-    for line in text.split('\n') {
-        width = width.max(line_width(font, scale, line));
-        lines += 1.0;
-    }
-    (width, line_height * lines)
-}
-
-/// ab_glyph can't rasterize at an angle, so rotated text renders into a
-/// transparent scratch pixmap that gets blitted with a rotate transform.
-fn draw_text_rotated(
-    pixmap: &mut Pixmap,
-    font: &FontRef<'_>,
-    pos: Pos2,
-    text: &str,
-    size: f32,
-    color: Color32,
-    rotation: f32,
-) {
-    let (w, h) = text_block_size(font, text, size);
-    // Padding for glyph overhang (italic-ish curves, descenders past the
-    // metric box).
-    let pad = (size * 0.5).ceil().max(4.0);
-    let tw = clamp_px((w + pad * 2.0).ceil(), 1 << 14).max(1);
-    let th = clamp_px((h + pad * 2.0).ceil(), 1 << 14).max(1);
-    let Some(mut temp) = Pixmap::new(tw, th) else {
-        draw_text(pixmap, font, pos, text, size, color);
-        return;
-    };
-    draw_text(&mut temp, font, Pos2::new(pad, pad), text, size, color);
-    let center = Pos2::new(pos.x + w * 0.5, pos.y + h * 0.5);
-    let paint = PixmapPaint { quality: FilterQuality::Bilinear, ..PixmapPaint::default() };
-    pixmap.draw_pixmap(
-        (pos.x - pad).round() as i32,
-        (pos.y - pad).round() as i32,
-        temp.as_ref(),
-        &paint,
-        rotation_transform(rotation, center),
-        None,
-    );
-}
-
-fn draw_text_centered(
-    pixmap: &mut Pixmap,
-    font: &FontRef<'_>,
-    center: Pos2,
-    text: &str,
-    size: f32,
-    color: Color32,
-) {
-    let scale = px_scale(font, size);
-    let scaled = font.as_scaled(scale);
-    let width = line_width(font, scale, text);
-    let baseline = center.y + (scaled.ascent() + scaled.descent()) * 0.5;
-    draw_text_line(
-        pixmap,
-        font,
-        Pos2::new(center.x - width * 0.5, baseline),
-        text,
-        scale,
-        color,
-    );
-}
-
-/// Rasterize one line with its baseline-left at `origin`.
-fn draw_text_line(
-    pixmap: &mut Pixmap,
-    font: &FontRef<'_>,
-    origin: Pos2,
-    line: &str,
-    scale: PxScale,
-    color: Color32,
-) {
-    let scaled = font.as_scaled(scale);
-    let [r, g, b, a] = color.to_srgba_unmultiplied();
-    let (w, h) = (pixmap.width(), pixmap.height());
-    let mut x = origin.x;
-    let mut prev = None;
-    for ch in line.chars() {
-        let id = scaled.glyph_id(ch);
-        if let Some(prev) = prev {
-            x += scaled.kern(prev, id);
-        }
-        let glyph = id.with_scale_and_position(scale, ab_glyph::point(x, origin.y));
-        x += scaled.h_advance(id);
-        prev = Some(id);
-        let Some(outlined) = font.outline_glyph(glyph) else { continue };
-        let bounds = outlined.px_bounds();
-        let data = pixmap.data_mut();
-        outlined.draw(|gx, gy, coverage| {
-            let px = bounds.min.x + gx as f32;
-            let py = bounds.min.y + gy as f32;
-            if px < 0.0 || py < 0.0 || px >= w as f32 || py >= h as f32 {
-                return;
-            }
-            let idx = 4 * (clamp_px(py, h - 1) as usize * w as usize + clamp_px(px, w - 1) as usize);
-            let alpha = coverage * (f32::from(a) / 255.0);
-            if alpha <= 0.0 {
-                return;
-            }
-            // Premultiplied source-over; also accumulates the alpha channel
-            // so text works on the transparent scratch pixmap rotated text
-            // renders through (a no-op on the opaque screenshot).
-            let blend = |dst: u8, src: u8| -> u8 {
-                let v = f32::from(src) * alpha + f32::from(dst) * (1.0 - alpha);
-                u8::try_from((v.round().clamp(0.0, 255.0)) as i32).unwrap_or(u8::MAX)
-            };
-            data[idx] = blend(data[idx], r);
-            data[idx + 1] = blend(data[idx + 1], g);
-            data[idx + 2] = blend(data[idx + 2], b);
-            data[idx + 3] = blend(data[idx + 3], 255);
-        });
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,7 +290,186 @@ mod tests {
     use eframe::egui::{Pos2, Rect};
 
     fn style(color: Color32) -> Style {
-        Style { color, width: 4.0, font_size: 24.0 }
+        Style {
+            color,
+            width: 4.0,
+            font_size: 24.0,
+        }
+    }
+
+    struct TestDir(std::path::PathBuf);
+
+    impl TestDir {
+        fn new() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "scrannotate-export-{}-{stamp}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).expect("test directory");
+            Self(path)
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn repeated_saves_preserve_existing_files_and_use_suffixes() {
+        let dir = TestDir::new();
+        let stem = "scrannotate-2026-09-20_120000";
+        let first = RgbaImage::from_pixel(2, 2, image::Rgba([255, 0, 0, 255]));
+        let second = RgbaImage::from_pixel(2, 2, image::Rgba([0, 255, 0, 255]));
+        let a = save_png_named(&first, &dir.0, stem).expect("first save");
+        let b = save_png_named(&second, &dir.0, stem).expect("second save");
+        assert_eq!(a.file_name().unwrap(), format!("{stem}.png").as_str());
+        assert_eq!(b.file_name().unwrap(), format!("{stem}-1.png").as_str());
+        assert_eq!(image::open(a).unwrap().into_rgba8(), first);
+        assert_eq!(image::open(b).unwrap().into_rgba8(), second);
+    }
+
+    #[test]
+    fn simultaneous_saves_reserve_distinct_names() {
+        let dir = TestDir::new();
+        let barrier = std::sync::Barrier::new(8);
+        std::thread::scope(|scope| {
+            let saves: Vec<_> = (0..8)
+                .map(|i| {
+                    let dir = &dir.0;
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        let img = RgbaImage::from_pixel(2, 2, image::Rgba([i, 100, 200, 255]));
+                        barrier.wait();
+                        let path = save_png_named(&img, dir, "scrannotate-2026-09-20_120000")
+                            .expect("concurrent save");
+                        (path, img)
+                    })
+                })
+                .collect();
+            let mut paths = std::collections::HashSet::new();
+            for save in saves {
+                let (path, img) = save.join().expect("save thread");
+                assert_eq!(image::open(&path).unwrap().into_rgba8(), img);
+                assert!(paths.insert(path), "two saves returned the same path");
+            }
+        });
+    }
+
+    #[test]
+    fn failed_save_removes_only_its_incomplete_file() {
+        use std::io::Write as _;
+        let dir = TestDir::new();
+        let original = dir.0.join("scrannotate-fixed.png");
+        std::fs::write(&original, b"existing image").unwrap();
+        let result = save_unique(&dir.0, "scrannotate-fixed", |file| {
+            file.write_all(b"partial PNG")?;
+            Err(std::io::Error::other("injected write failure").into())
+        });
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(original).unwrap(), b"existing image");
+        assert!(!dir.0.join("scrannotate-fixed-1.png").exists());
+        assert_eq!(std::fs::read_dir(&dir.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn unchanged_pixels_preserve_straight_rgba_at_every_alpha() {
+        let base = RgbaImage::from_fn(256, 32, |x, _| image::Rgba([37, 173, 241, x as u8]));
+        assert_eq!(render_to_image(&base, &[], None).unwrap(), base);
+        let ann = Annotation::new(
+            Shape::Highlight {
+                rect: Rect::from_min_max(Pos2::new(0.0, 24.0), Pos2::new(256.0, 32.0)),
+            },
+            style(Color32::RED),
+        );
+        let out = render_to_image(&base, &[ann], None).unwrap();
+        for x in 0..256 {
+            assert_eq!(out.get_pixel(x, 0), base.get_pixel(x, 0));
+        }
+    }
+
+    #[test]
+    fn transparent_highlights_export_straight_colors_and_roundtrip_png() {
+        let dir = TestDir::new();
+        let base = RgbaImage::new(32, 32);
+        let ann = Annotation::new(
+            Shape::Highlight {
+                rect: Rect::from_min_max(Pos2::new(4.0, 4.0), Pos2::new(28.0, 28.0)),
+            },
+            style(Color32::RED),
+        );
+        let out = render_to_image(&base, std::slice::from_ref(&ann), None).unwrap();
+        assert_eq!(*out.get_pixel(10, 10), image::Rgba([255, 0, 0, 70]));
+        let path = save_png_named(&out, &dir.0, "alpha").unwrap();
+        assert_eq!(image::open(path).unwrap().into_rgba8(), out);
+
+        let translucent = RgbaImage::from_pixel(32, 32, image::Rgba([0, 0, 255, 128]));
+        let out = render_to_image(&translucent, &[ann], None).unwrap();
+        assert_eq!(*out.get_pixel(10, 10), image::Rgba([110, 0, 145, 163]));
+    }
+
+    #[test]
+    fn text_and_rotated_text_keep_straight_alpha() {
+        let base = RgbaImage::new(128, 128);
+        for rotation in [0.0, 0.4] {
+            let ann = Annotation {
+                shape: Shape::Text {
+                    pos: Pos2::new(24.0, 32.0),
+                    text: "A 🚀\nB".into(),
+                },
+                style: style(Color32::RED),
+                rotation,
+            };
+            let out = render_to_image(&base, &[ann], None).unwrap();
+            let painted: Vec<_> = out.pixels().filter(|p| p[3] != 0).collect();
+            assert!(painted.len() > 100);
+            assert!(
+                painted.iter().any(|p| p[3] < 255),
+                "antialiased edge pixels"
+            );
+            assert!(
+                painted
+                    .iter()
+                    .all(|p| p[0] == 255 && p[1] == 0 && p[2] == 0)
+            );
+        }
+    }
+
+    #[test]
+    fn distinct_fallback_emoji_export_distinct_glyphs() {
+        let base = RgbaImage::new(96, 96);
+        for rotation in [0.0, -0.3] {
+            let render = |text: &str| {
+                let ann = Annotation {
+                    shape: Shape::Text {
+                        pos: Pos2::new(24.0, 24.0),
+                        text: text.into(),
+                    },
+                    style: Style {
+                        font_size: 36.0,
+                        ..style(Color32::WHITE)
+                    },
+                    rotation,
+                };
+                render_to_image(&base, &[ann], None).unwrap()
+            };
+            let face = render("😀");
+            let rocket = render("🚀");
+            assert_ne!(
+                face, rocket,
+                "fallback emoji became the same missing-glyph box"
+            );
+            assert!(face.pixels().any(|p| p[3] != 0));
+            assert!(rocket.pixels().any(|p| p[3] != 0));
+        }
     }
 
     #[test]
@@ -389,11 +499,17 @@ mod tests {
                 style(red),
             ),
             Annotation::new(
-                Shape::Line { a: Pos2::new(40.0, 140.0), b: Pos2::new(240.0, 180.0) },
+                Shape::Line {
+                    a: Pos2::new(40.0, 140.0),
+                    b: Pos2::new(240.0, 180.0),
+                },
                 style(blue),
             ),
             Annotation::new(
-                Shape::Arrow { a: Pos2::new(40.0, 220.0), b: Pos2::new(240.0, 300.0) },
+                Shape::Arrow {
+                    a: Pos2::new(40.0, 220.0),
+                    b: Pos2::new(240.0, 300.0),
+                },
                 style(red),
             ),
             Annotation::new(
@@ -428,7 +544,11 @@ mod tests {
                 style(Color32::WHITE),
             ),
             Annotation::new(
-                Shape::Marker { pos: Pos2::new(600.0, 420.0), number: 1, target: None },
+                Shape::Marker {
+                    pos: Pos2::new(600.0, 420.0),
+                    number: 1,
+                    target: None,
+                },
                 style(red),
             ),
             Annotation::new(
@@ -465,17 +585,26 @@ mod tests {
             .flat_map(|x| (160..168).map(move |y| (x, y)))
             .map(|(x, y)| *out.get_pixel(x, y))
             .collect();
-        assert!(block.windows(2).all(|w| w[0] == w[1]), "pixelate block not uniform");
+        assert!(
+            block.windows(2).all(|w| w[0] == w[1]),
+            "pixelate block not uniform"
+        );
         let base_block: Vec<_> = (552..560)
             .flat_map(|x| (160..168).map(move |y| (x, y)))
             .map(|(x, y)| *base.get_pixel(x, y))
             .collect();
-        assert!(base_block.windows(2).any(|w| w[0] != w[1]), "base unexpectedly uniform");
+        assert!(
+            base_block.windows(2).any(|w| w[0] != w[1]),
+            "base unexpectedly uniform"
+        );
 
         let cropped = render_to_image(
             &base,
             &annotations,
-            Some(Rect::from_min_max(Pos2::new(100.0, 50.0), Pos2::new(500.0, 350.0))),
+            Some(Rect::from_min_max(
+                Pos2::new(100.0, 50.0),
+                Pos2::new(500.0, 350.0),
+            )),
         )
         .expect("render cropped");
         assert_eq!(cropped.dimensions(), (400, 300));
@@ -483,7 +612,9 @@ mod tests {
         if let Some(dir) = std::env::var_os("SCRANNOTATE_TEST_OUT") {
             let dir = std::path::PathBuf::from(dir);
             out.save(dir.join("render_full.png")).expect("save full");
-            cropped.save(dir.join("render_cropped.png")).expect("save cropped");
+            cropped
+                .save(dir.join("render_cropped.png"))
+                .expect("save cropped");
         }
     }
 }

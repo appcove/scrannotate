@@ -1,32 +1,5 @@
-# A version bump merged to main -> tag + GitHub Release with prebuilt binaries
-# for six targets. The preparation job is deliberately in this workflow: tags
-# created with GITHUB_TOKEN do not trigger a second workflow, so a separate
-# tag-only build workflow would never run for an automatic release.
-#
-# The Cargo.toml package version is the source of truth. If its v<version> release
-# already exists, the workflow is a no-op. Otherwise it creates a draft release
-# (and tag), the matrix fills in the assets, and the final job publishes it — so
-# users never see a half-populated release. Existing drafts are resumed on a
-# rerun, making a failed matrix build recoverable.
-# Archive names (scrannotate-<target>.tar.gz / .zip + .sha256) follow
-# cargo-binstall's default lookup pattern, so `cargo binstall scrannotate`
-# works with no extra metadata. macOS targets also publish
-# scrannotate-<target>.app.zip — the bundle users double-click; the tarball
-# stays for binstall and CLI installs.
-#
-# Platform notes:
-# - Linux builds on ubuntu-24.04: the capture backend needs
-#   libpipewire-0.3-dev >= 1.x (22.04's 0.3.48 is too old for the libspa
-#   crate), which makes glibc 2.39 the binary's floor.
-# - macOS binaries are ad-hoc signed (codesign "-"): arm64 requires a
-#   signature, and the linker's own one can be fragile. Without a Developer
-#   ID + notarization, browser-downloaded archives still need the
-#   README-documented Gatekeeper unlock.
-# - windows-11-arm runners are free for public repositories only.
-# - macos-15-intel is the last Intel image GitHub offers (until Aug 2027);
-#   after that, build x86_64-apple-darwin on the arm64 runner via
-#   `rustup target add`.
-
+# Validation and packaging use one immutable commit. Drafts can be resumed
+# only at their original commit, and all six targets must pass before upload.
 name: Release
 
 on:
@@ -34,7 +7,11 @@ on:
     branches: [main]
     paths:
       - Cargo.toml
-      - .github/workflows/release.yml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - .github/workflows/**
+      - scripts/**
+      - packaging/**
   workflow_dispatch:
 
 concurrency:
@@ -45,6 +22,7 @@ permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
+  MACOSX_DEPLOYMENT_TARGET: "12.3"
 
 jobs:
   prepare-release:
@@ -55,46 +33,32 @@ jobs:
       build: ${{ steps.release.outputs.build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
       - name: Create or resume the draft release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          version="$(cargo metadata --format-version 1 --no-deps --locked | jq -r '.packages[] | select(.name == "scrannotate") | .version')"
-          if [[ -z "$version" || "$version" == "null" ]]; then
-            echo "Could not read the scrannotate package version" >&2
-            exit 1
-          fi
+          SOURCE_SHA: ${{ github.sha }}
+        run: python scripts/prepare_release.py --source-sha "$SOURCE_SHA"
 
-          tag="v$version"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-          release="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft 2>/dev/null || true)"
-          if [[ -n "$release" ]]; then
-            if [[ "$(jq -r '.isDraft' <<< "$release")" == "true" ]]; then
-              echo "Resuming existing draft release $tag"
-              echo "build=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "Release $tag is already published; nothing to do"
-              echo "build=false" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
-          fi
-
-          gh release create "$tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --draft \
-            --generate-notes \
-            --target "$GITHUB_SHA" \
-            --title "scrannotate $version"
-          echo "build=true" >> "$GITHUB_OUTPUT"
+  validate:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.build == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.prepare-release.outputs.source_sha }}
 
   upload-assets:
-    needs: prepare-release
+    needs: [prepare-release, validate]
     if: needs.prepare-release.outputs.build == 'true'
     strategy:
       fail-fast: false
@@ -109,56 +73,75 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-15
           - target: x86_64-pc-windows-msvc
-            os: windows-latest
+            os: windows-2025
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      SOURCE_SHA: ${{ needs.prepare-release.outputs.source_sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.source_sha }}
+          persist-credentials: false
+      - name: Verify source commit
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
       - name: Install PipeWire build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev clang pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build and package macOS app
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - name: Build the release executable
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Generate dependency notices
+        run: python scripts/third_party_notices.py --target "${{ matrix.target }}" --output target/THIRD_PARTY_NOTICES.txt
+      - name: Sign the macOS executable
         if: runner.os == 'macOS'
+        run: codesign --force --sign - "target/${{ matrix.target }}/release/scrannotate"
+      - name: Package executable and notices
         run: |
-          cargo build --release --locked --target "${{ matrix.target }}"
+          binary="target/${{ matrix.target }}/release/scrannotate"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            binary="$binary.exe"
+          fi
+          python scripts/package_release.py --binary "$binary" \
+            --target "${{ matrix.target }}" --source-sha "$SOURCE_SHA" \
+            --notices target/THIRD_PARTY_NOTICES.txt
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
           archive="scrannotate-${{ matrix.target }}.app.zip"
           packaging/macos/bundle.sh \
             "target/${{ matrix.target }}/release/scrannotate" \
-            "${{ needs.prepare-release.outputs.version }}" \
-            "dist/$archive"
+            "$RELEASE_VERSION" "dist/$archive" target/THIRD_PARTY_NOTICES.txt
           (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: scrannotate
-          target: ${{ matrix.target }}
-          ref: refs/tags/${{ needs.prepare-release.outputs.tag }}
-          tar: unix
-          zip: windows
-          checksum: sha256
-          locked: true
-          codesign: "-"
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload macOS app
-        if: runner.os == 'macOS'
+      - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "${{ needs.prepare-release.outputs.tag }}" \
-            dist/*.app.zip dist/*.app.zip.sha256 \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
   publish-release:
-    needs: [prepare-release, upload-assets]
+    needs: [prepare-release, validate, upload-assets]
+    if: needs.prepare-release.outputs.build == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - name: Publish the draft release
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.prepare-release.outputs.source_sha }}
+          persist-credentials: false
+      - name: Recheck source and publish the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "${{ needs.prepare-release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false
+          SOURCE_SHA: ${{ needs.prepare-release.outputs.source_sha }}
+        run: python scripts/prepare_release.py --source-sha "$SOURCE_SHA" --publish

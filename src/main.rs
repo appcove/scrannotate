@@ -10,13 +10,16 @@ mod clipboard;
 mod document;
 mod editor;
 mod export;
+mod platform_files;
+#[cfg(test)]
+mod test_support;
 mod prefs;
 mod ui;
 mod view;
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use clap::Parser;
 
 /// Screenshot + annotation tool. Captures one screen per shot as a raw
@@ -27,6 +30,14 @@ use clap::Parser;
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
+    /// Print version and packaging feature information, then exit.
+    #[arg(long)]
+    build_info: bool,
+
+    /// Report startup errors only on stderr, including when all streams are redirected.
+    #[arg(long)]
+    no_dialogs: bool,
+
     /// Which screen to capture. Wayland: the first use of a number asks
     /// you to pick the monitor it means (the grant persists).
     /// X11/macOS/Windows: the Nth display, primary first.
@@ -50,12 +61,23 @@ struct Cli {
     #[arg(long, value_name = "DIR")]
     save_path: Option<PathBuf>,
 
-    /// Annotate an existing image instead of capturing the screen.
+    /// Annotate an existing image instead of capturing the screen. Mac App
+    /// Store builds cannot read arbitrary paths; there the Open PNG panel
+    /// starts at this location and the file must be picked explicitly.
     #[arg(long, value_name = "PATH")]
     from_file: Option<PathBuf>,
+
+    /// Choose a PNG with the native file dialog (Windows/macOS).
+    #[arg(long = "open", conflicts_with_all = ["from_file", "pick_screen"])]
+    open_image: bool,
 }
 
 fn default_output_dir() -> PathBuf {
+    // Known Folders on Windows includes redirected/OneDrive Pictures.
+    #[cfg(any(target_os = "macos", windows))]
+    if let Some(pictures) = dirs::picture_dir() {
+        return pictures.join("Screenshots");
+    }
     match std::env::home_dir() {
         Some(home) if home.join("Pictures").is_dir() => home.join("Pictures/Screenshots"),
         Some(home) => home.join("Screenshots"),
@@ -95,10 +117,21 @@ fn demo_base() -> image::RgbaImage {
     }
     // "Sensitive" strip the demo blurs: colorful glyph-ish blocks so the
     // pixelation reads clearly.
-    let colors = [[210u8, 90, 90], [90, 140, 210], [120, 180, 95], [205, 160, 80]];
+    let colors = [
+        [210u8, 90, 90],
+        [90, 140, 210],
+        [120, 180, 95],
+        [205, 160, 80],
+    ];
     for i in 0..24u32 {
         let x = 545 + i * 19;
-        fill(x, 414 + (i % 3) * 5, x + 13, 452 - (i % 2) * 7, colors[(i % 4) as usize]);
+        fill(
+            x,
+            414 + (i % 3) * 5,
+            x + 13,
+            452 - (i % 2) * 7,
+            colors[(i % 4) as usize],
+        );
     }
     fill(540, 560, 1330, 700, [222, 228, 238]); // panel
     fill(1130, 760, 1350, 830, [47, 82, 224]); // primary button
@@ -106,7 +139,7 @@ fn demo_base() -> image::RgbaImage {
     img
 }
 
-fn main() -> Result<()> {
+fn main() -> std::process::ExitCode {
     // The windows-subsystem binary detaches from any console; reattach to
     // the parent's so --help/--pick-screen/save-path output still shows
     // when run from a terminal (a no-op under a hotkey/shortcut launch).
@@ -116,7 +149,120 @@ fn main() -> Result<()> {
         AttachConsole(ATTACH_PARENT_PROCESS);
     }
 
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(err) => {
+            if err.use_stderr() {
+                let dialogs = !std::env::args_os().any(|arg| arg == "--no-dialogs");
+                report_startup_error(&err.to_string(), dialogs);
+                return std::process::ExitCode::FAILURE;
+            }
+            let _ = err.print();
+            return std::process::ExitCode::SUCCESS;
+        }
+    };
+    let dialogs = !cli.no_dialogs;
+    match run(cli) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(err) => {
+            report_startup_error(&format!("{err:#}"), dialogs);
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", windows))]
+fn has_terminal() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdin().is_terminal()
+        || std::io::stdout().is_terminal()
+        || std::io::stderr().is_terminal()
+}
+
+fn report_startup_error(message: &str, dialogs: bool) {
+    eprintln!("scrannotate: {message}");
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = dialogs;
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        // A console user already has the complete diagnostic. Finder/Start
+        // launches need a native dialog, even if the graphics renderer failed.
+        if dialogs && !has_terminal() {
+            rfd::MessageDialog::new()
+                .set_title("scrannotate could not start")
+                .set_description(message)
+                .set_level(rfd::MessageLevel::Error)
+                .show();
+        }
+    }
+}
+
+/// Finder/Start launches must offer a way forward when capture permission or
+/// hardware initialization fails. CLI launches keep their ordinary error exit.
+fn capture_with_recovery(
+    options: &capture::CaptureOptions,
+    dialogs: bool,
+) -> Result<Option<(capture::Capture, bool)>> {
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = dialogs;
+        capture::capture(options).map(|capture| Some((capture, false)))
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    loop {
+        match capture::capture(options) {
+            Ok(capture) => return Ok(Some((capture, false))),
+            Err(error) => {
+                if !dialogs || has_terminal() {
+                    return Err(error);
+                }
+                let guidance = if cfg!(target_os = "macos") {
+                    "Check Screen Recording permission in System Settings → Privacy & Security. After changing permission, you may need to quit and reopen Scrannotate.\n\n"
+                } else {
+                    "Check that screen capture is allowed and the selected display is connected.\n\n"
+                };
+                let choice = rfd::MessageDialog::new()
+                        .set_title("Scrannotate could not capture the screen")
+                        .set_description(format!(
+                            "{error:#}\n\n{guidance}Choose Yes to retry, No to open a PNG image, or Cancel to quit."
+                        ))
+                        .set_level(rfd::MessageLevel::Error)
+                        .set_buttons(rfd::MessageButtons::YesNoCancel)
+                        .show();
+                match choice {
+                    rfd::MessageDialogResult::Yes => continue,
+                    rfd::MessageDialogResult::No => {
+                        return Ok(platform_files::open_image(None)?.map(|image| {
+                            (
+                                capture::Capture {
+                                    image,
+                                    display: None,
+                                },
+                                true,
+                            )
+                        }));
+                    }
+                    _ => return Ok(None),
+                }
+            }
+        }
+    }
+}
+
+fn run(cli: Cli) -> Result<()> {
+    if cli.build_info {
+        println!("version={}", env!("CARGO_PKG_VERSION"));
+        #[cfg(all(target_os = "macos", feature = "mac-app-store"))]
+        println!("SCRANNOTATE_MAC_APP_STORE_BUILD=1");
+        #[cfg(not(all(target_os = "macos", feature = "mac-app-store")))]
+        println!("SCRANNOTATE_MAC_APP_STORE_BUILD=0");
+        println!(
+            "privacy_url={}",
+            option_env!("SCRANNOTATE_PRIVACY_URL").unwrap_or("")
+        );
+        return Ok(());
+    }
     // Docs/dev hook: SCRANNOTATE_DEMO renders a canned scene (pair with
     // SCRANNOTATE_SHOT to save a window screenshot and exit). Read once and
     // passed down so the two layers can't disagree about demo mode.
@@ -137,23 +283,57 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    let mut select_full = cli.from_file.is_some() || cli.open_image;
     let (img, display) = match &cli.from_file {
-        Some(path) => (
-            image::open(path)
-                .with_context(|| format!("opening {}", path.display()))?
-                .to_rgba8(),
-            None,
-        ),
+        // A CLI path grants no access under the App Sandbox: opening it
+        // directly fails with a permission error. Treat it as a starting
+        // location for the Open PNG panel and require an explicit pick.
+        #[cfg(all(target_os = "macos", feature = "mac-app-store"))]
+        Some(path) => {
+            eprintln!(
+                "This Mac App Store build cannot open {} directly; choose it in the Open PNG panel.",
+                path.display()
+            );
+            let start = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty());
+            match platform_files::open_image(start)? {
+                Some(image) => (image, None),
+                None => return Ok(()),
+            }
+        }
+        #[cfg(not(all(target_os = "macos", feature = "mac-app-store")))]
+        Some(path) => {
+            // Scoped: the Mac App Store arm above has no use for it.
+            use anyhow::Context;
+            (
+                image::open(path)
+                    .with_context(|| format!("opening {}", path.display()))?
+                    .to_rgba8(),
+                None,
+            )
+        }
+        None if cli.open_image => match platform_files::open_image(None)? {
+            Some(image) => (image, None),
+            None => return Ok(()),
+        },
         None if demo => (demo_base(), None),
         None => {
             if cli.delay > 0 {
                 std::thread::sleep(std::time::Duration::from_secs(cli.delay));
             }
-            let capture::Capture { image, display } = capture::capture(&capture::CaptureOptions {
-                cursor: cli.cursor,
-                pick_screen: cli.pick_screen,
-                screen: cli.screen,
-            })?;
+            let Some((capture::Capture { image, display }, opened_file)) = capture_with_recovery(
+                &capture::CaptureOptions {
+                    cursor: cli.cursor,
+                    pick_screen: cli.pick_screen,
+                    screen: cli.screen,
+                },
+                !cli.no_dialogs,
+            )?
+            else {
+                return Ok(());
+            };
+            select_full = opened_file;
             (image, display)
         }
     };
@@ -163,7 +343,6 @@ fn main() -> Result<()> {
     // start with no region (drag one out; Enter still copies the whole
     // screen); --from-file images open with everything selected so the
     // toolbar is up immediately.
-    let select_full = cli.from_file.is_some();
 
     let mut viewport = eframe::egui::ViewportBuilder::default()
         .with_app_id("scrannotate")
@@ -184,7 +363,10 @@ fn main() -> Result<()> {
         viewport.with_fullscreen(true)
     };
     #[allow(unused_mut)]
-    let mut options = eframe::NativeOptions { viewport, ..Default::default() };
+    let mut options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
     #[cfg(target_os = "macos")]
     {
         // Without the default menu bar, Cmd+Q reaches egui's shortcut
@@ -199,7 +381,13 @@ fn main() -> Result<()> {
         "scrannotate",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(app::ScreencapApp::new(img, out_dir, select_full, demo_mode, display)))
+            Ok(Box::new(app::ScreencapApp::new(
+                img,
+                out_dir,
+                select_full,
+                demo_mode,
+                display,
+            )))
         }),
     )
     .map_err(|err| anyhow!("running ui: {err}"))

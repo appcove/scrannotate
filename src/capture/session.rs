@@ -13,10 +13,20 @@ use pinray::{CaptureEvent, CaptureSession, CursorMode, FrameData, PixelFormat, S
 /// default 60 fps would churn gigabytes through the allocator during the
 /// settle window — enough to get the process OOM-killed. 10 fps is plenty.
 pub fn builder(embed_cursor: bool) -> SessionBuilder {
-    CaptureSession::builder()
+    let builder = CaptureSession::builder()
         .pixel_format(PixelFormat::Rgba8888)
         .frame_rate(Some(10))
-        .cursor_mode(if embed_cursor { CursorMode::Embedded } else { CursorMode::Hidden })
+        .cursor_mode(if embed_cursor {
+            CursorMode::Embedded
+        } else {
+            CursorMode::Hidden
+        });
+    // pinray's Auto backend prefers DXGI, which does not rotate portrait
+    // frames or composite a separate hardware cursor. WGC handles those
+    // semantics. Do not silently fall back to incorrect output on failure.
+    #[cfg(windows)]
+    let builder = builder.backend_preference(pinray::BackendPreference::WindowsWgc);
+    builder
 }
 
 /// Take one frame from a started session: wait for the stream, keep

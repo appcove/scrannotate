@@ -130,7 +130,13 @@ impl Editor {
         // Assembled in one place so the shape cannot drift: the mode, then
         // the pairs, joined by the one separator.
         let line = |mode: &str, parts: &[&str]| {
-            (StatusKind::Hint, format!("{mode} — {}", parts.join(HINT_SEP)))
+            let message = format!("{mode} — {}", parts.join(HINT_SEP));
+            let message = if cfg!(target_os = "macos") {
+                message.replace("Ctrl+", "Cmd+")
+            } else {
+                message
+            };
+            (StatusKind::Hint, message)
         };
         match &self.state {
             // The alert asks a question; a shortcut list would bury it.

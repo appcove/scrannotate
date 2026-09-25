@@ -18,9 +18,10 @@ use crate::editor::state::EditorState;
 const INPUT_ID: &str = "text-editor-input";
 /// Height of the drag grip, in screen px.
 const GRIP_H: f32 = 20.0;
-/// Floor for the grip's width: an empty buffer measures near zero, and the
-/// grip is the only way to move a box before anything is typed into it.
-const GRIP_MIN_W: f32 = 54.0;
+/// Width of the drag grip, in screen px. Fixed rather than matched to the
+/// text's width — a large font size made the grip a bar as wide as the box
+/// itself, towering over the small drag affordance it actually is.
+const GRIP_W: f32 = 40.0;
 
 /// Something the text editor deliberately declined to handle.
 pub enum TextEditAction {
@@ -68,7 +69,6 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
             f.layout_no_wrap(buf.as_str().to_owned(), layout_font.clone(), text_color)
         })
     };
-    let grip_w = width.max(GRIP_MIN_W);
     // The grip rides above the box, unless the box sits close enough to the
     // top of the canvas that there is no room for it up there.
     let grip_above = screen_pos.y - GRIP_H >= canvas.min.y;
@@ -83,7 +83,7 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
             // for.
             ui.spacing_mut().item_spacing.y = 0.0;
             if grip_above {
-                grip = Some(drag_grip(ui, grip_w));
+                grip = Some(drag_grip(ui));
             }
             // Plain Enter commits — consumed *before* the TextEdit runs, or
             // the widget first inserts a newline at the cursor and that
@@ -112,7 +112,7 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
                 edit.just_created = false;
             }
             if !grip_above {
-                grip = Some(drag_grip(ui, grip_w));
+                grip = Some(drag_grip(ui));
             }
             if ui.input(|i| i.key_pressed(Key::Escape)) {
                 cancel = true;
@@ -138,11 +138,11 @@ pub fn show(ctx: &Context, editor: &mut Editor, canvas: Rect) -> Option<TextEdit
     None
 }
 
-/// The box's drag handle: a dotted bar the width of the editor. Drawn with
-/// its own fill rather than the egui widget visuals because it sits over
-/// captured pixels, which can be any color at all.
-fn drag_grip(ui: &mut Ui, width: f32) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, GRIP_H), Sense::drag());
+/// The box's drag handle: a small dotted tab, left-aligned above (or below)
+/// the box. Drawn with its own fill rather than the egui widget visuals
+/// because it sits over captured pixels, which can be any color at all.
+fn drag_grip(ui: &mut Ui) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(GRIP_W, GRIP_H), Sense::drag());
     let hot = resp.hovered() || resp.dragged();
     ui.painter().rect_filled(
         rect,
