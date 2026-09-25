@@ -10,6 +10,7 @@ use eframe::egui::{
 
 use crate::annotate::Tool;
 use crate::editor::{Editor, StatusKind};
+use crate::ui::paint::paint_move_icon;
 use crate::ui::{
     ACCENT, ACTIVE_TOOL_FILL, BTN_H, TOOLBAR_W, TOOLS, UiScale, about::About, color_picker,
 };
@@ -176,25 +177,17 @@ impl Toolbar {
                     }
                     let content_top = ui.cursor().top();
                     let gap = ui.spacing().item_spacing.x;
-                    let (grip_rect, grip) = ui.allocate_exact_size(
-                        Vec2::new(ui.available_width(), 22.0 * scale),
-                        Sense::drag(),
-                    );
-                    ui.painter().text(
-                        grip_rect.center(),
-                        Align2::CENTER_CENTER,
-                        "• • •",
-                        FontId::proportional((14.0 * scale).round().max(10.0)),
-                        ui.visuals().weak_text_color(),
-                    );
-                    if grip.hovered() || grip.dragged() {
-                        ctx.set_cursor_icon(egui::CursorIcon::Grab);
-                    }
-                    if grip.dragged() {
-                        self.pos = Some(pos + grip.drag_delta());
-                    }
-                    ui.separator();
-
+                    // Grip and UI-size share one row. The grip used to be a
+                    // "• • •" text bar the full width of the panel, with the
+                    // size picker on its own row below; neither needed that
+                    // much space. The grip now draws the same move-cross
+                    // glyph the region's own drag grip already uses
+                    // (`paint::paint_move_icon`) — three dots read as
+                    // nothing in particular, and the two affordances do the
+                    // same thing, so they should look the same — sitting on
+                    // the left with the three size buttons right-aligned in
+                    // what's left.
+                    //
                     // Toolbar density: three small buttons, each an "A"
                     // drawn at that option's own relative size, so the row
                     // previews the effect directly instead of naming it. No
@@ -203,9 +196,8 @@ impl Toolbar {
                     // -touched setting, not a primary action, so it sits
                     // small and tucked to the right instead of claiming the
                     // same visual weight as Undo or Copy.
-                    // Pinned to an exact height and laid out right-to-left,
-                    // rather than a plain `ui.horizontal` nudged over with
-                    // `add_space`: a bare horizontal layout reserves at
+                    // Pinned to an exact height, rather than a plain
+                    // `ui.horizontal`: a bare horizontal layout reserves at
                     // least `spacing().interact_size.y` (still the big
                     // 32px-ish tool-button height at this point) for its
                     // row even when its content is shorter, which is what
@@ -215,64 +207,88 @@ impl Toolbar {
                     let small_h = (20.0 * scale).round();
                     ui.allocate_ui_with_layout(
                         Vec2::new(ui.available_width(), small_h),
-                        egui::Layout::right_to_left(egui::Align::Center),
+                        egui::Layout::left_to_right(egui::Align::Center),
                         |ui| {
-                            let btn_w = (24.0 * scale).round();
-                            // `add_sized`'s size is a floor, not a cap —
-                            // Button's own min_size.y is unioned with
-                            // `interact_size.y` (harmless, pinned to
-                            // `small_h` below) but its *content* height
-                            // (glyph + button_padding) is never clamped
-                            // down to fit. With button_padding untouched
-                            // and the "Large" glyph deliberately drawn
-                            // bigger, that button alone came out ~27px
-                            // tall against a 20px target. Zero the padding
-                            // here so content height is the glyph alone,
-                            // and scale that glyph by *both* the chosen
-                            // option's own relative size and the active
-                            // toolbar scale, so it can't exceed `small_h`.
-                            ui.spacing_mut().interact_size = Vec2::new(btn_w, small_h);
-                            ui.spacing_mut().button_padding = Vec2::ZERO;
-                            for opt in UiScale::ALL.into_iter().rev() {
-                                let active = self.ui_scale == opt;
-                                let text = RichText::new("A")
-                                    .size((14.0 * opt.factor() * scale).round().max(8.0))
-                                    .color(if active {
-                                        Color32::WHITE
-                                    } else {
-                                        Color32::from_gray(235)
-                                    });
-                                let mut btn = Button::new(text);
-                                if active {
-                                    btn = btn.fill(ACTIVE_TOOL_FILL);
-                                }
-                                let resp = ui
-                                    .add_sized(Vec2::new(btn_w, small_h), btn)
-                                    .on_hover_text(opt.name());
-                                if resp.clicked() {
-                                    resp.surrender_focus();
-                                    if self.ui_scale != opt {
-                                        self.ui_scale = opt;
-                                        // The panel is about to change size,
-                                        // but `pos`'s clamp this frame was
-                                        // already computed from last frame's
-                                        // (now-stale) `self.size` — a
-                                        // toolbar docked near the canvas
-                                        // edge could render past it for this
-                                        // one frame. Ask for an immediate
-                                        // repaint so the next frame's
-                                        // correctly-measured clamp lands
-                                        // right away, instead of waiting on
-                                        // whatever future input happens to
-                                        // trigger one. (The status line's
-                                        // high-water mark resets itself
-                                        // on that frame, keyed on the
-                                        // scale it was measured at — see
-                                        // `status_min_h_scale`.)
-                                        ctx.request_repaint();
+                            let (grip_rect, grip) = ui
+                                .allocate_exact_size(Vec2::new(small_h, small_h), Sense::drag());
+                            let hot = grip.hovered() || grip.dragged();
+                            paint_move_icon(
+                                ui.painter(),
+                                grip_rect.center(),
+                                small_h * 0.4,
+                                if hot {
+                                    Color32::WHITE
+                                } else {
+                                    ui.visuals().weak_text_color()
+                                },
+                            );
+                            if hot {
+                                ctx.set_cursor_icon(egui::CursorIcon::Grab);
+                            }
+                            if grip.dragged() {
+                                self.pos = Some(pos + grip.drag_delta());
+                            }
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                let btn_w = (24.0 * scale).round();
+                                // `add_sized`'s size is a floor, not a cap —
+                                // Button's own min_size.y is unioned with
+                                // `interact_size.y` (harmless, pinned to
+                                // `small_h` below) but its *content* height
+                                // (glyph + button_padding) is never clamped
+                                // down to fit. With button_padding untouched
+                                // and the "Large" glyph deliberately drawn
+                                // bigger, that button alone came out ~27px
+                                // tall against a 20px target. Zero the padding
+                                // here so content height is the glyph alone,
+                                // and scale that glyph by *both* the chosen
+                                // option's own relative size and the active
+                                // toolbar scale, so it can't exceed `small_h`.
+                                ui.spacing_mut().interact_size = Vec2::new(btn_w, small_h);
+                                ui.spacing_mut().button_padding = Vec2::ZERO;
+                                for opt in UiScale::ALL.into_iter().rev() {
+                                    let active = self.ui_scale == opt;
+                                    let text = RichText::new("A")
+                                        .size((14.0 * opt.factor() * scale).round().max(8.0))
+                                        .color(if active {
+                                            Color32::WHITE
+                                        } else {
+                                            Color32::from_gray(235)
+                                        });
+                                    let mut btn = Button::new(text);
+                                    if active {
+                                        btn = btn.fill(ACTIVE_TOOL_FILL);
+                                    }
+                                    let resp = ui
+                                        .add_sized(Vec2::new(btn_w, small_h), btn)
+                                        .on_hover_text(opt.name());
+                                    if resp.clicked() {
+                                        resp.surrender_focus();
+                                        if self.ui_scale != opt {
+                                            self.ui_scale = opt;
+                                            // The panel is about to change size,
+                                            // but `pos`'s clamp this frame was
+                                            // already computed from last frame's
+                                            // (now-stale) `self.size` — a
+                                            // toolbar docked near the canvas
+                                            // edge could render past it for this
+                                            // one frame. Ask for an immediate
+                                            // repaint so the next frame's
+                                            // correctly-measured clamp lands
+                                            // right away, instead of waiting on
+                                            // whatever future input happens to
+                                            // trigger one. (The status line's
+                                            // high-water mark resets itself
+                                            // on that frame, keyed on the
+                                            // scale it was measured at — see
+                                            // `status_min_h_scale`.)
+                                            ctx.request_repaint();
+                                        }
                                     }
                                 }
-                            }
+                                },
+                            );
                         },
                     );
                     ui.separator();

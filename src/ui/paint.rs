@@ -400,8 +400,9 @@ fn paint_rotate_icon(painter: &egui::Painter, center: Pos2, radius: f32, color: 
     );
 }
 
-/// Four-way arrow cross: the move glyph.
-fn paint_move_icon(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
+/// Four-way arrow cross: the move glyph. Shared with the toolbar's own drag
+/// grip (`toolbar.rs`), so the two affordances read as the same gesture.
+pub(crate) fn paint_move_icon(painter: &egui::Painter, center: Pos2, radius: f32, color: Color32) {
     let stroke = Stroke::new(1.8, color);
     for dir in [Vec2::RIGHT, Vec2::LEFT, Vec2::DOWN, Vec2::UP] {
         painter.line_segment([center, center + dir * (radius - 2.0)], stroke);
