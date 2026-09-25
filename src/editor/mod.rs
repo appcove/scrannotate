@@ -191,7 +191,12 @@ impl Editor {
                     ),
                     tool => line(
                         tool.label(),
-                        &["drag: draw", "tap Space: Select", "right-drag: new region"],
+                        &[
+                            "drag: draw",
+                            "click an item: pick it up",
+                            "tap Space: Select",
+                            "right-drag: new region",
+                        ],
                     ),
                 }
             }
@@ -751,7 +756,22 @@ impl Editor {
                     self.doc.commit();
                 }
             }
-            _ => {}
+            // Drawing tools. Every shape they make needs a drag, so a plain
+            // click was a dead gesture — spend it on the one thing the tool
+            // otherwise can't do: pick up what is already there. Dragging
+            // still draws, so drawing over an existing shape is unaffected.
+            // The tool switch is the point, not a side effect: handles and
+            // the selection outline exist only under Select, so grabbing an
+            // item without it would select something you could neither see
+            // nor resize.
+            _ => {
+                if self.state.is_idle()
+                    && let Some(id) = topmost_hit(&self.doc, p, false, self.view.zoom, measure)
+                {
+                    self.set_tool(Tool::Select); // clears the selection...
+                    self.selected.insert(id); // ...so this has to follow it
+                }
+            }
         }
     }
 
@@ -1342,6 +1362,52 @@ mod tests {
             panic!("shape changed")
         };
         assert_eq!(rect, r);
+    }
+
+    #[test]
+    fn clicking_an_item_with_a_drawing_tool_picks_it_up() {
+        // Drawing tools used to swallow clicks entirely, so a placed shape
+        // could not be grabbed again without first leaving the tool.
+        for tool in [Tool::Arrow, Tool::Rect, Tool::Line, Tool::Pen, Tool::Ellipse] {
+            let mut ed = editor();
+            let r = Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(200.0, 150.0));
+            let id = add_highlight(&mut ed, r);
+            ed.set_tool(tool);
+            let inside = Pos2::new(150.0, 120.0);
+            ed.click(inside, inside, canvas(), Modifiers::NONE, &measure);
+            assert_eq!(ed.tool, Tool::Select, "{tool:?}: must land on Select");
+            assert!(ed.selected.contains(&id), "{tool:?}: must hold the item");
+            // Select is what paints handles, so the item is now resizable.
+            assert_eq!(ed.single_selected(), Some(id), "{tool:?}");
+        }
+    }
+
+    #[test]
+    fn clicking_empty_space_with_a_drawing_tool_stays_on_the_tool() {
+        let mut ed = editor();
+        add_highlight(&mut ed, Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(200.0, 150.0)));
+        ed.set_tool(Tool::Rect);
+        let miss = Pos2::new(400.0, 400.0);
+        ed.click(miss, miss, canvas(), Modifiers::NONE, &measure);
+        assert_eq!(ed.tool, Tool::Rect, "a miss must not cost you the tool");
+        assert!(ed.selected.is_empty());
+    }
+
+    #[test]
+    fn dragging_over_an_existing_item_still_draws() {
+        // The click path grabs items; the drag path must still draw, or
+        // boxing an existing annotation becomes impossible.
+        let mut ed = editor();
+        let r = Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(200.0, 150.0));
+        add_highlight(&mut ed, r);
+        ed.set_tool(Tool::Rect);
+        let from = Pos2::new(120.0, 110.0); // starts inside the highlight
+        ed.primary_drag_start(from, from, canvas(), Modifiers::NONE, &measure);
+        assert!(matches!(ed.state, EditorState::DrawingShape { .. }));
+        ed.pointer_moved(Pos2::new(300.0, 300.0));
+        ed.pointer_up(&measure);
+        assert_eq!(ed.tool, Tool::Rect, "drawing keeps the tool");
+        assert_eq!(ed.doc.annotations().len(), 2, "the drag drew a second shape");
     }
 
     #[test]
